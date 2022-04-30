@@ -50,6 +50,7 @@ body {
     align-items: center;
 
     font-size: 25px;
+    color: white;
 }
 .nav-items a:hover{
     color: #0000ff;

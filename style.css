@@ -1,0 +1,330 @@
+body {
+    height: 100%;
+    width: 100%;
+
+    padding: 0;
+    margin: 0;
+
+}
+
+/* 네이게이션 바 */
+.navbar {
+    height: 0;
+    width: 100%;
+    position: sticky;
+    top: 0;
+    
+    z-index: 1;
+
+    display: flex;
+}
+.logo-image {
+
+    width: 78px;
+    height: 48px;
+
+    border-radius: 5px;
+    margin: 20px 0 0 20px;
+
+    flex-basis: 30%;
+}
+
+.nav-items {
+    width: 50vh;
+
+    display:flex;
+    flex-direction: row-reverse;
+    justify-content: space-evenly;
+
+    align-items: center;
+
+    margin: 40px 20px 0 900px;
+
+    flex-basis: 30%;
+}
+.nav-items a{
+    flex-basis: 30%;
+    
+    display:flex;
+    flex-direction: column;
+    align-items: center;
+
+    font-size: 25px;
+}
+.nav-items a:hover{
+    color: #0000ff;
+}
+
+/* 메인 비디오 */
+.backgroundmusic {
+    width: 0;
+    height: 0;
+    padding: 0;
+    margin: 0;
+    visibility: hidden;
+}
+
+.jb-box { 
+    width: 100%; 
+    height: 100%; 
+    margin: 0;
+    padding: 0; 
+    position: relative; 
+}
+
+video { 
+    width: 100%; 
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.button { 
+    position: absolute; 
+    top: 50%; 
+    width: 100%; 
+}
+.button p { 
+    margin-top: -24px; 
+    text-align: center; 
+    font-size: 48px; 
+    color: #ffffff; 
+}
+
+/* 콘텐츠 시작 */
+.day-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 자기소개 */
+iframe {
+    margin: 50px 0 50px 0;
+}
+
+.discription p{
+    font-size: 20px;
+}
+.name {
+    font-size: 60px;
+}
+.aboutme {
+    width: 100%;
+    height: 100%;
+    margin: 100px 0 100px 0;
+
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+.profile-img {
+    width: 300px;
+    height: 300px;
+
+    border-radius: 10px;
+    margin: 0 20px 0 0;
+}
+.contact img {
+    width: 30px;
+    height: 30px;
+    border-radius: 5px;
+}
+
+/* 개발경험 */
+
+.career {
+    width: 100%;
+    height: 100%;
+    background-image: url("src/img/background.jpg");
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-color: #35528c;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.past{
+    width: 600px;
+    margin: 50px 0 50px 0;
+    padding: 20px 0 20px 0;
+
+    background-color: #ffffff;
+    opacity: 0.8;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.past p {
+    font-size: 30px;
+}
+.past-title{
+    font-size: 60px;
+    font-display: bold;
+}
+.past meter{
+    size: 30px;
+}
+
+.future{
+    width: 600px;
+    margin: 50px 0 50px 0;
+    padding: 20px 0 20px 0;
+
+    background-color: #ffffff;
+    opacity: 0.8;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.future div img{
+    width: 100px;
+    height: 100px;
+}
+.future-title{
+    font-size: 60px;
+    font-display: bold;
+}
+.future p {
+    font-size: 30px;
+}
+
+/* 방명록 */
+.guest {
+    width: 60%;
+    height: 100%;
+    margin: 50px 0 50px 0;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.guest-title{
+    font-size: 45px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.board-row {
+    font-size: 1.3rem;
+    padding: 18px;
+    border-radius: 14px;
+    background-color: #4d97e7;
+    margin: .4rem 0;
+}
+
+.message-form {
+    text-align: center;
+
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+
+.message-form input {
+    border-radius: 4px;
+    padding: 0 .4rem;
+}
+
+.message-content {
+    width: 30rem;
+    height: 2rem;
+    font-size: 1.2rem;
+    line-height: 2rem;
+}
+
+.message-sender {
+    width: 10rem;
+    height: 2rem;
+    line-height: 2rem;
+    font-size: 1.2rem;
+}
+
+.send-btn {
+    display: inline-block;
+    width: 100px;
+    height: 0.4rem;
+    margin: 2rem 0;
+    padding: 1rem 0;
+    background-color: #15448d;
+    color: #000000;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .4s ease-out;
+
+    text-align: center;
+    align-items: center;
+}
+
+.send-btn:hover {
+    color: #15448d;
+    background-color: #000000;
+    border: 2px solid #15448d;
+}
+
+/* 다크 모드 스위치 */
+
+.label {
+    display: flex;
+    align-items: center;
+    justify-content: space-evenly;
+    width: 50px;
+    height: 26px;
+    background-color: #111;
+    border-radius: 50px;
+
+    transform: scale(1.5);
+    position: relative;
+}
+
+.ball {
+    position: absolute;
+    background-color: #fff;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+
+
+    /* 부모자식의 position의 관계를 설정해주면 top/left : 'n'px 로 위치를 조정할 수 있다. */
+    top: 2px;
+    left: 2px;
+
+    transition: transform 0.2s ease-out;
+}
+
+body.dark {
+    background-color: #292c35;
+}
+body.dark p {
+    color: #fff;
+}
+
+/* '+' 연산자는 인접한 태그에 접근할 수 있음 */
+.checkbox:checked + .label .ball {
+    transform: translateX(24px);
+}
+.checkbox {
+    position: absolute;
+    opacity: 0;
+}
+.fa-moon {
+    color: #f1c40f;
+}
+.fa-sun {
+    color: #f39c12;
+}
+.label {
+    margin-bottom: 30px;
+}

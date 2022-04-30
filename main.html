@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> 물 만난 물고기 </title>
+
+    <link rel="stylesheet" href="style.css">
+    <script type="module" src="app.js"></script>
+    <link 
+        rel="stylesheet" 
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.8.2/css/all.min.css"
+    />
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <a href="main.html"><img class="logo-image" src="src/img/logo.png"></a>
+        </div>
+        
+        <div class="nav-items">
+            <a class="nav-guest">guest book</a>
+            <a class="nav-career">career</a>
+            <a class="nav-me">about me</a>
+        </div>
+    </nav>
+
+    <!-- 낮 -->
+    <section class="day-content">
+        <!-- 플레이 버튼 -->
+
+        <!-- Main the ocean video -->
+        <div class="jb-box">
+            <video muted loop class="backgroundvideo">
+              <source src="src/video/ocean.mp4" type="video/mp4">
+              <strong>Your browser does not support the video tag.</strong>
+            </video>
+            <div class="button">
+              <p> Play </p>
+            </div>
+        </div>
+
+        <iframe width="560" height="315" src="https://www.youtube.com/embed/YMgFEl5h8nI?autoplay=1" title="YouTube video player"
+                frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen>
+        </iframe>
+
+        <div class="aboutme">
+            <div class="profile">
+                <img class="profile-img" src="src/img/profile.jpg">
+            </div>
+            <div class="discription">
+                <a class="name">이의제</a>
+
+                <p>안녕하세요! </p>
+                <p>멋쟁이 사자처럼 여러분을 뵙게 되어 물 만난 물고기가 되었습니다!</p>
+                <p>바다를 항해하는 기분으로 앞으로의 여정을 함께 하고 싶습니다!</p>
+                <div class="contact">
+                    <!-- github, ig, blog -->
+                    <a href="https://github.com/euije"><img src="https://user-images.githubusercontent.com/12531340/166069019-096a36fc-8c82-4107-a01b-5b5e5eb40b1a.png"></a>
+                    <a href="https://www.instagram.com/agenda511/"><img src="https://user-images.githubusercontent.com/12531340/166068702-74d15d88-2939-4c4c-abc1-b11fc6aac1cd.png"></a>
+                    <a href="https://blog.naver.com/exitfill1234"><img src="https://user-images.githubusercontent.com/12531340/166068980-0d8f6d79-aee9-4fb1-a505-6910d4c03d9c.png"></a>
+                </div>
+            </div>
+            
+            
+        </div>
+    
+        <div class="career">
+            <div class="past">
+                <p class="past-title"> 개발 경험 </p>
+                <!-- 퍼센테이지 입력 , 가능 / 불가능 구분 -->
+                <p> HTML : <meter value="10" min="0" max="100" low="30" high="70" optimum="80"></meter></p>
+                <p> CSS : <meter value="10" min="0" max="100" low="30" high="70" optimum="80"></meter></p>
+                <p> JavaScript : <meter value="10" min="0" max="100" low="30" high="70" optimum="80"></meter></p>
+                <p> Android : <meter value="7" min="0" max="100" low="30" high="70" optimum="80"></meter></p>
+                <p> Unity : <meter value="10" min="0" max="100" low="30" high="70" optimum="80"></meter></p>
+                <p> Klaytn : <meter value="5" min="0" max="100" low="30" high="70" optimum="80"></meter></p>
+            </div>
+            
+            <div class="future">
+                <p class="future-title"> 기회가 된다면 배워보고 싶은 것들 </p>
+                <p> Mobile </p>
+                <div>
+                    <img src="https://user-images.githubusercontent.com/12531340/166088908-2aabe8a6-4d9d-4895-935a-12ef8da05d59.png">
+                    <img src="https://user-images.githubusercontent.com/12531340/166088385-d431f255-7d1f-444e-828f-41da2d2fa359.png">    
+                </div>
+                
+                <p> Game </p>
+                <div>
+                    <img src="https://user-images.githubusercontent.com/12531340/166088975-f1ea3fa6-7912-43a5-8a3a-c26849b34210.png">
+                    <img src="https://user-images.githubusercontent.com/12531340/166088578-6c5d577b-93be-4817-9599-de847315cb28.png">
+                    <img src="https://user-images.githubusercontent.com/12531340/166088639-41f9caab-1038-46d8-b177-205f9ca39498.png">    
+                </div>
+                
+                <p> Block-chain </p>
+                <div>
+                    <img src="https://user-images.githubusercontent.com/12531340/166088661-b907fae0-3afa-4585-8a54-076f45692bc3.png">
+                    <img src="https://user-images.githubusercontent.com/12531340/166088699-e3929e8d-0036-4a99-9f9f-d4fe050fdfd8.png">
+                    <img src="https://user-images.githubusercontent.com/12531340/166088716-710ed8ed-128d-4aa7-966c-fd88be98cd97.png">    
+                </div>
+                
+            </div>
+        </div>
+    
+        <div class="guest">
+            
+            <div class="guest-title">방명록</div>
+            <div class="board">
+                <!-- messages that i received -->
+            </div>
+
+            <div class="message-form">
+                <input type="text" class="message-content" placeholder="방명록을 남겨보세요." />
+                <br /><br />
+
+                <div class="send-btn">SEND</div>
+            </div>
+
+        </div>
+        
+        <!-- In-visible : Sound of wave -->
+        <audio controls loop class="backgroundmusic">
+            <source src="src/audio/wave.ogg" type="audio/ogg">
+            <source src="src/audio/wave.mp3" type="audio/mpeg">
+          Your browser does not support the audio element.
+        </audio>
+
+        <!-- Dark Mode button -->
+        <input type="checkbox" class="checkbox" id="checkbox">
+        <label for="checkbox" class="label">
+            <i class="fas fa-moon"></i>
+            <i class="fas fa-sun"></i>
+    
+            <div class="ball"></div>
+        </label>
+
+    </section>
+
+
+    <!-- 스위치 -->
+    <!-- 다음 버전 : 다크 모드 전환시 콘텐츠 변경 -->
+    
+    <!-- 밤 -->
+    <!-- <section>
+        <div>
+            무모함
+            <p>엉뚱하고도 어리숙하지만 빛나는 결과가 기다리는 것을 알기에 매순간 즐김</p>
+        </div>
+        
+        <div>기쁨</div>
+        
+        <div>기억</div>
+
+    </section> -->
+
+</body>
+
+</html>

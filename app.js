@@ -103,5 +103,8 @@ checkbox.addEventListener('click', toggleClick);
 
 function toggleClick() {
     document.body.classList.toggle('dark');
+    document.querySelector('.past').style.backgroundColor = '#292c34';
+    document.querySelector('.future').style.backgroundColor = '#292c34';
+    
     console.log('Working!');
 }

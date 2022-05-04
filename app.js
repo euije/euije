@@ -103,8 +103,13 @@ checkbox.addEventListener('click', toggleClick);
 
 function toggleClick() {
     document.body.classList.toggle('dark');
-    document.querySelector('.past').style.backgroundColor = '#292c34';
-    document.querySelector('.future').style.backgroundColor = '#292c34';
-    
-    console.log('Working!');
+  
+    if(checkbox.checked){
+      document.querySelector('.past').style.backgroundColor = '#292c34';
+      document.querySelector('.future').style.backgroundColor = '#292c34'; 
+    }
+    else {
+      document.querySelector('.past').style.backgroundColor = '#ffffff';
+      document.querySelector('.future').style.backgroundColor = '#ffffff';
+    }
 }

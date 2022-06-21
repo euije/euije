@@ -7,7 +7,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title> 물 만난 물고기 </title>
 
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="./css/style.css">
+    <link rel="stylesheet" href="./css/scss/mixin.css">
+    <link rel="stylesheet" href="./css/scss/variable.css">
     <script type="module" src="app.js"></script>
     <link 
         rel="stylesheet" 
@@ -22,9 +24,9 @@
         </div>
         
         <div class="nav-items">
-            <a class="nav-guest">guest book</a>
-            <a class="nav-career">career</a>
-            <a class="nav-me">about me</a>
+            <p class="nav-guest">guest book</p>
+            <p class="nav-career">career</p>
+            <p class="nav-me">about me</p>
         </div>
     </nav>
 
@@ -35,11 +37,11 @@
         <!-- Main the ocean video -->
         <div class="jb-box">
             <video muted loop class="backgroundvideo">
-              <source src="src/video/ocean.mp4" type="video/mp4">
-              <strong>Your browser does not support the video tag.</strong>
+                <source src="src/video/ocean.mp4" type="video/mp4">
+                <strong>Your browser does not support the video tag.</strong>
             </video>
             <div class="button">
-              <p> Play </p>
+                <p> Play </p>
             </div>
         </div>
 
@@ -105,6 +107,26 @@
                 
             </div>
         </div>
+
+        <div class="career-mobile">
+            <div class="satellite_wrap">
+                <div class="satellite_box satellite_box1">
+                    <img src="https://user-images.githubusercontent.com/12531340/166088908-2aabe8a6-4d9d-4895-935a-12ef8da05d59.png">
+                </div>
+                <div class="satellite_box satellite_box2">
+                    <img src="https://user-images.githubusercontent.com/12531340/166088385-d431f255-7d1f-444e-828f-41da2d2fa359.png">    
+                </div>
+                <div class="satellite_box satellite_box3">
+                    <img src="https://user-images.githubusercontent.com/12531340/166088975-f1ea3fa6-7912-43a5-8a3a-c26849b34210.png">
+                </div>
+                <div class="satellite_box satellite_box4">
+                    <img src="https://user-images.githubusercontent.com/12531340/166088578-6c5d577b-93be-4817-9599-de847315cb28.png">
+                </div>
+                <div class="satellite_box satellite_box5">
+                    <img src="https://user-images.githubusercontent.com/12531340/166088639-41f9caab-1038-46d8-b177-205f9ca39498.png">    
+                </div>
+            </div>
+        </div>
     
         <div class="guest">
             
@@ -126,7 +148,7 @@
         <audio controls loop class="backgroundmusic">
             <source src="src/audio/wave.ogg" type="audio/ogg">
             <source src="src/audio/wave.mp3" type="audio/mpeg">
-          Your browser does not support the audio element.
+            Your browser does not support the audio element.
         </audio>
 
         <!-- Dark Mode button -->
@@ -139,23 +161,6 @@
         </label>
 
     </section>
-
-
-    <!-- 스위치 -->
-    <!-- 다음 버전 : 다크 모드 전환시 콘텐츠 변경 -->
-    
-    <!-- 밤 -->
-    <!-- <section>
-        <div>
-            무모함
-            <p>엉뚱하고도 어리숙하지만 빛나는 결과가 기다리는 것을 알기에 매순간 즐김</p>
-        </div>
-        
-        <div>기쁨</div>
-        
-        <div>기억</div>
-
-    </section> -->
 
 </body>
 

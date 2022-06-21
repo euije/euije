@@ -1,6 +1,6 @@
 body {
     height: 100%;
-    width: 100%;
+    width: 100vh;
 
     padding: 0;
     margin: 0;
@@ -9,8 +9,9 @@ body {
 
 /* 네이게이션 바 */
 .navbar {
-    height: 0;
-    width: 100%;
+    width: 100vw;
+    height: 20vh;
+
     position: sticky;
     top: 0;
     
@@ -18,19 +19,27 @@ body {
 
     display: flex;
 }
+.logo {
+    width: 60vw;
+    height: 100vh;
+}
 .logo-image {
 
-    width: 78px;
-    height: 48px;
+    width: 30vw;
+    height: 10vh;
+
+    margin: 5vh 0 0 5vw;
 
     border-radius: 5px;
-    margin: 20px 0 0 20px;
 
     flex-basis: 30%;
 }
 
 .nav-items {
-    width: 50vh;
+    width: 50vw;
+    height: 20vh;
+
+    margin-left: 120vw;
 
     display:flex;
     flex-direction: row-reverse;
@@ -38,11 +47,16 @@ body {
 
     align-items: center;
 
-    margin: 40px 20px 0 900px;
-
     flex-basis: 30%;
 }
-.nav-items a{
+.nav-items p{
+    width: 10vw;
+    height: 10vh;
+
+
+    padding-right: 20vw;
+
+
     flex-basis: 30%;
     
     display:flex;
@@ -52,7 +66,7 @@ body {
     font-size: 25px;
     color: white;
 }
-.nav-items a:hover{
+.nav-items p:hover{
     color: #0000ff;
 }
 
@@ -115,7 +129,7 @@ iframe {
     font-size: 60px;
 }
 .aboutme {
-    width: 100%;
+    width: 190vw;
     height: 100%;
     margin: 100px 0 100px 0;
 

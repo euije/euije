@@ -1,0 +1,97 @@
+@import './variable.scss';
+
+@mixin respond-to($media) {
+    @if $media == mobile {
+        @media only screen and (max-width: $tabletSize) {
+            @content; // CSS 추후 설정
+        }
+    }
+
+    @else if $media == tablet {
+        @media only screen and (min-width: $tabletSize) and (max-width: $pcSize) {
+            @content;
+        }
+    }
+
+    @else if $media == pc {
+        @media only screen and (min-width: $pcSize) {
+            @content;
+        }
+    }
+}
+
+@mixin rotate-mobile(){
+    .career-mobile { width: 20rem; height: 20rem; position: relative; border: 2px none #426190; border-radius: 50%; margin: 25% auto; }
+
+    .satellite_wrap { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
+    .satellite_box img {
+        width: 130px;
+        height: 130px;
+    }
+    .satellite_box1 {
+        img { position: relative; top: 30%; left: -50%; }
+    }
+    .satellite_box2 {
+        img { position: relative; top: -14%; left: 0%; }
+    }
+    .satellite_box3 {
+        img { position: relative; top: 30%; left: 40%; }
+    }
+    .satellite_box4 {
+        img { position: relative; top: 80%; left: 25%; }
+    }
+    .satellite_box5 {
+        img { position: relative; top: 80%; left: -25%; }
+    }
+
+    .satellite_box {
+        position: absolute; top: -15%; left: -25%; width: 150%; height: 150%; animation: forwardRotate 8s linear infinite; text-align: center; line-height: 7rem;
+
+        img { width: 10rem; height: 10rem; border: 2px none #426190; border-radius: 50%; background: #fff; box-shadow: 2px 2px 10px 2px #b3b6da; font-size: 1rem; font-weight: bold; color: #426190; animation: reverseRotate 8s linear infinite; }    
+    }
+
+
+    @keyframes forwardRotate {
+        from { transform: rotate(0deg), translate(-50% -50%); }
+        to { transform: rotate(360deg); }
+    }
+    @keyframes reverseRotate {
+        from { transform: rotate(-0deg); }
+    to { transform: rotate(-360deg); }
+    }
+}
+
+@include respond-to(mobile) {
+    .jb-box{
+        display: none;
+    }
+    .career{
+        display: none;
+    }
+    .backgroundmusic{
+        display: none;
+    }
+    .nav-items p{
+        color: black;
+    }
+    @include rotate-mobile();
+}
+@include respond-to(tablet) {
+    .jb-box{
+        display: none;
+    }
+    .career{
+        display: none;
+    }
+    .backgroundmusic{
+        display: none;
+    }
+    .nav-items p{
+        color: black;
+    }
+}
+@include respond-to(pc) {
+    .career-mobile{
+        display: none;
+    }
+}

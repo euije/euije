@@ -1,5 +1,4 @@
-# Euije.xyz
+# Euije
 
-- ![https://euije.xyz](https://euije.xyz)
 - 안녕하세요!
-- 우리 반갑게 인사해요!
+- 개발과 개발 문화를 사랑합니다

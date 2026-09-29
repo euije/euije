@@ -150,9 +150,8 @@ function escapeXml(text: string) {
   });
 }
 
-async function isKoreanPremadeVoiceAllowed(apiKey: string, voiceId: string, gender: Gender) {
+async function isPremadeVoiceAllowed(apiKey: string, voiceId: string, gender: Gender) {
   const query = new URLSearchParams({
-    language: "ko",
     gender: gender.toLowerCase(),
     category: "premade",
     page_size: "100",
@@ -341,8 +340,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) return fail(res, 503, "ElevenLabs (일레븐랩스) API 키를 서버 설정에 등록해 주세요.");
-    if (!await isKoreanPremadeVoiceAllowed(apiKey, voiceName, gender)) {
-      return fail(res, 400, "한국어 기본 음성 목록에서 목소리를 선택해 주세요.");
+    if (!await isPremadeVoiceAllowed(apiKey, voiceName, gender)) {
+      return fail(res, 400, "선택한 성별의 기본 음성 목록에서 목소리를 골라 주세요.");
     }
     const elevenLabsResponse = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceName)}?output_format=mp3_44100_128`,

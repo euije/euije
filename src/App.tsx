@@ -28,14 +28,17 @@ const VOICE_NAME_TRANSLATIONS: Record<string, string> = {
   F3: "여성 음성 3번", F4: "여성 음성 4번", F5: "여성 음성 5번",
   M1: "남성 음성 1번", M2: "남성 음성 2번", M3: "남성 음성 3번",
   M4: "남성 음성 4번", M5: "남성 음성 5번",
-  Alice: "앨리스", Aria: "아리아", Charlotte: "샬럿", Chris: "크리스", Daniel: "다니엘",
-  George: "조지", Grace: "그레이스", Jessica: "제시카", Liam: "리암", Lily: "릴리",
-  Matilda: "마틸다", Nicole: "니콜", Patrick: "패트릭", Rachel: "레이첼", Sam: "샘",
+  Adam: "애덤", Alice: "앨리스", Aria: "아리아", Bella: "벨라", Bill: "빌",
+  Brian: "브라이언", Callum: "캘럼", Charlie: "찰리", Charlotte: "샬럿", Chris: "크리스",
+  Daniel: "다니엘", Eric: "에릭", George: "조지", Grace: "그레이스", Harry: "해리",
+  Jessica: "제시카", Laura: "로라", Liam: "리암", Lily: "릴리", Matilda: "마틸다",
+  Nicole: "니콜", Patrick: "패트릭", Rachel: "레이첼", Roger: "로저", Sam: "샘",
   Sarah: "사라", Will: "윌",
 };
 
 function voiceLabel(name: string) {
-  return `${name} (${VOICE_NAME_TRANSLATIONS[name] ?? "한국어 음성"})`;
+  const shortName = name.split(" - ")[0].trim();
+  return `${shortName} (${VOICE_NAME_TRANSLATIONS[shortName] ?? "한국어 음성"})`;
 }
 
 const GOOGLE_VOICES: Record<"standard" | "wavenet" | "neural2" | "chirp3hd", Record<Gender, Voice[]>> = {

@@ -46,7 +46,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   try {
     const query = new URLSearchParams({
-      language: "ko",
       gender,
       category: "premade",
       include_total_count: "false",

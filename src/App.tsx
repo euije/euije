@@ -106,7 +106,7 @@ const MODEL_OPTIONS: Record<ProviderId, ModelChoice[]> = {
     { id: "eleven_flash_v2_5", label: "Flash v2.5 (빠른 합성 버전 2.5)", detail: "빠른 합성", price: "계정에 남은 크레딧에서 차감" },
   ],
   supertonic: [
-    { id: "supertonic-3", label: "Supertonic 3 (수퍼토닉 3)", detail: "기기에서 직접 생성", price: "기기에서 실행 · 첫 다운로드 약 400MB (400메가바이트)" },
+    { id: "supertonic-3", label: "Supertonic 3 (수퍼토닉 3)", detail: "기기에서 직접 생성", price: "최초 다운로드 약 400MB (400메가바이트) · 이후 저장된 모델 사용" },
   ],
 };
 
@@ -245,7 +245,7 @@ function TtsApp() {
   }, [audioUrl]);
 
   useEffect(() => {
-    if (provider === "supertonic" || !TURNSTILE_SITE_KEY || !turnstileRef.current) return;
+    if (!TURNSTILE_SITE_KEY || !turnstileRef.current) return;
     const container = turnstileRef.current;
     let widgetId: string | undefined;
     let script = document.querySelector<HTMLScriptElement>("script[data-turnstile]");
@@ -286,7 +286,7 @@ function TtsApp() {
       if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
       turnstileWidgetIdRef.current = undefined;
     };
-  }, [provider]);
+  }, []);
 
   useEffect(() => {
     if (provider !== "elevenlabs") {
@@ -332,7 +332,6 @@ function TtsApp() {
     setElevenVoices([]);
     setError("");
     setAudioUrl(null);
-    setTurnstileToken("");
   };
 
   const chooseModel = (nextModel: string) => {
@@ -493,7 +492,7 @@ function TtsApp() {
           <p className="price-note">{modelInfo.price}{provider === "google" && <span> · {GEMINI_MODELS.includes(model) ? "Gemini API (제미나이 API)" : "Google Cloud TTS (구글 클라우드 음성 변환)"} 요금</span>}</p>
           {provider === "openrouter" && model === "fish-audio/s2.1-pro-free:free" && <p className="provider-note">Fish Audio (피시 오디오) 무료 모델이며 기본 음성을 사용합니다. 무료 제공과 처리량은 OpenRouter (오픈라우터)와 Fish Audio (피시 오디오)의 정책에 따라 달라질 수 있어요.</p>}
           {provider === "openrouter" && model === "microsoft/mai-voice-2-flash" && <p className="provider-note">OpenRouter (오픈라우터)를 통해 한국어 Haena (해나, 여성)·Junho (준호, 남성) 음성을 사용합니다.</p>}
-          {provider === "supertonic" && <p className="provider-note">첫 실행 때 약 400MB (400메가바이트)를 내려받습니다. <a href="https://huggingface.co/Supertone/supertonic-3" target="_blank" rel="noreferrer">Hugging Face (허깅페이스)의 모델 이용 조건</a>을 확인해 주세요.</p>}
+          {provider === "supertonic" && <p className="provider-note">모델을 기기에 저장해 다음 실행부터 재사용합니다. 처음 받을 때 약 400MB (400메가바이트)가 필요해요. <a href="https://huggingface.co/Supertone/supertonic-3" target="_blank" rel="noreferrer">Hugging Face (허깅페이스)의 모델 이용 조건</a>을 확인해 주세요.</p>}
           {provider !== "supertonic" && <p className="provider-note">입력 문장은 선택한 TTS 서비스로 전송돼요.</p>}
         </div>
 
@@ -619,8 +618,8 @@ function TtsApp() {
           />
         </div>
 
-        {provider !== "supertonic" && TURNSTILE_SITE_KEY && (
-          <div className="turnstile-area">
+        {TURNSTILE_SITE_KEY && (
+          <div className="turnstile-area" style={{ display: provider === "supertonic" ? "none" : undefined }}>
             <div ref={turnstileRef} />
           </div>
         )}
@@ -637,7 +636,7 @@ function TtsApp() {
             {loading ? (
               <><span className="spinner" /> 음성을 만들고 있어요</>
             ) : (
-              <><Icon name="play" /> 미리 듣기</>
+              <><Icon name="play" /> 생성하기</>
             )}
           </button>
           <span className="action-caption">{generationNote || "생성 후 미리 듣고 MP3 (엠피쓰리) 파일로 저장할 수 있어요"}</span>

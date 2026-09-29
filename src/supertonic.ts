@@ -5,15 +5,50 @@ import { wavToMp3 } from "./audio";
 const MODEL_REVISION = "3cadd1ee6394adea1bd021217a0e650ede09a323";
 const MODEL_ROOT = `https://huggingface.co/Supertone/supertonic-3/resolve/${MODEL_REVISION}`;
 const ONNX_ROOT = `${MODEL_ROOT}/onnx`;
+const MODEL_CACHE_NAME = `supertonic-3-${MODEL_REVISION}`;
 
 ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/";
 ort.env.wasm.numThreads = 1;
 
 let ttsPromise: Promise<{ textToSpeech: any; cfgs: any }> | undefined;
 const stylePromises = new Map<string, Promise<any>>();
+let persistentCacheInstalled = false;
+
+function installPersistentModelCache() {
+  if (persistentCacheInstalled || !("caches" in window)) return;
+
+  const networkFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestUrl = input instanceof Request ? input.url : String(input);
+    if (!requestUrl.startsWith(`${MODEL_ROOT}/`)) return networkFetch(input, init);
+
+    let cache: Cache;
+    try {
+      cache = await window.caches.open(MODEL_CACHE_NAME);
+      const cached = await cache.match(requestUrl);
+      if (cached) return cached;
+    } catch {
+      return networkFetch(input, init);
+    }
+
+    const response = await networkFetch(input, init);
+    if (response.ok && response.status !== 206 && response.type !== "opaque") {
+      try {
+        await cache.put(requestUrl, response.clone());
+      } catch {
+        // Keep inference working if the browser's cache quota is full.
+      }
+    }
+    return response;
+  };
+  persistentCacheInstalled = true;
+
+  if (navigator.storage?.persist) void navigator.storage.persist().catch(() => false);
+}
 
 function loadModel(onStatus: (message: string) => void) {
   if (!ttsPromise) {
+    installPersistentModelCache();
     const executionProviders = "gpu" in navigator ? ["webgpu", "wasm"] : ["wasm"];
     const progress = (_name: string, index: number, total: number) => {
       onStatus(`모델을 불러오는 중이에요 (${index}/${total})`);
@@ -47,7 +82,7 @@ export async function synthesizeSupertonicMp3(
   speed: number,
   onStatus: (message: string) => void,
 ) {
-  onStatus("Supertonic 3 (수퍼토닉 3) 모델을 불러오는 중이에요. 첫 실행 때 약 400MB (400메가바이트)를 내려받아요.");
+  onStatus("Supertonic 3 (수퍼토닉 3) 모델을 준비하고 있어요. 처음에 약 400MB (400메가바이트)를 내려받고, 다음 실행부터는 기기에 저장된 파일을 재사용합니다.");
   const { textToSpeech, cfgs } = await loadModel(onStatus);
   onStatus("선택한 목소리를 준비하고 있어요.");
   const style = await loadStyle(voiceName);

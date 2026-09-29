@@ -337,7 +337,7 @@ function App() {
   return (
     <main className="page-shell">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="소리결 홈">
+        <a className="brand" href="/tts" aria-label="소리결 홈">
           <span className="brand-mark" aria-hidden="true">
             <i />
             <i />
@@ -504,7 +504,9 @@ function App() {
         <textarea
           className="script-input"
           aria-label="음성으로 바꿀 문장"
-          placeholder="여기에 문장을 입력해 주세요.\n\n예) 오늘은 기분 좋은 바람이 불어요. 천천히 주변을 둘러보며 걸어 볼까요?"
+          placeholder={`여기에 문장을 입력해 주세요.
+
+예) 오늘은 기분 좋은 바람이 불어요. 천천히 주변을 둘러보며 걸어 볼까요?`}
           value={text}
           onChange={changeText}
           maxLength={characterLimit}

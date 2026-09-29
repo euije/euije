@@ -71,8 +71,6 @@ const AZURE_VOICES: Record<Gender, Voice[]> = {
   MALE: ["InJoon", "BongJin", "GookMin", "Hyunsu"].map((name) => ({ id: `ko-KR-${name}Neural`, name: voiceLabel(name) })),
 };
 
-const GEMINI_MODELS = ["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"];
-
 type ModelChoice = {
   id: string;
   label: string;
@@ -85,6 +83,8 @@ type ModelChoice = {
 };
 
 const OPENROUTER_VOICES: Record<string, Record<Gender, Voice[]>> = {
+  "google/gemini-3.8-flash-tts": GEMINI_VOICES,
+  "google/gemini-3.8-flash-lite-tts": GEMINI_VOICES,
   "fish-audio/s2.1-pro-free:free": {
     FEMALE: [{ id: "fish-default", name: "모델 기본 음성" }],
     MALE: [{ id: "fish-default", name: "모델 기본 음성" }],
@@ -101,10 +101,10 @@ const MODEL_OPTIONS: Record<ProviderId, ModelChoice[]> = {
     { id: "neural2", label: "Neural2 (뉴럴 2)", detail: "균형 잡힌 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 16달러", speedMin: 0.25, speedMax: 2 },
     { id: "wavenet", label: "WaveNet (웨이브넷)", detail: "자연스러운 합성 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 16달러", speedMin: 0.25, speedMax: 2 },
     { id: "chirp3hd", label: "Chirp 3 HD (처프 3 고음질)", detail: "생성형 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 30달러", speedMin: 0.25, speedMax: 2 },
-    { id: "gemini-3.8-flash-lite-tts", label: "Gemini Flash-Lite TTS (제미나이 고속·경량 음성)", detail: "빠르고 비용 효율적", price: "Gemini API (제미나이 API) 종량제 · 사용 토큰 수 기준", supportsSpeed: false },
-    { id: "gemini-3.8-flash-tts", label: "Gemini Flash TTS (제미나이 고속 음성)", detail: "표현력 중심", price: "Gemini API (제미나이 API) 종량제 · 사용 토큰 수 기준", supportsSpeed: false },
   ],
   openrouter: [
+    { id: "google/gemini-3.8-flash-lite-tts", label: "Gemini 3.8 Flash-Lite TTS (제미나이 고속·경량 음성)", detail: "빠르고 비용 효율적", price: "입력 100만 토큰당 미화 0.50달러 · 음성 출력 100만 토큰당 미화 6달러", supportsSpeed: false },
+    { id: "google/gemini-3.8-flash-tts", label: "Gemini 3.8 Flash TTS (제미나이 고음질 음성)", detail: "표현력과 음성 품질 중심", price: "입력 100만 토큰당 미화 0.50달러 · 음성 출력 100만 토큰당 미화 9달러", supportsSpeed: false },
     { id: "fish-audio/s2.1-pro-free:free", label: "Fish Audio S2.1 Pro Free (피시 오디오 S2.1 프로 무료 모델)", detail: "무료 · 한국어 포함 83개 언어", price: "무료 · 사용량 정책 적용", supportsSpeed: false },
     { id: "microsoft/mai-voice-2-flash", label: "MAI Voice-2 Flash (마이 음성 2 플래시)", detail: "한국어 Haena (해나) · Junho (준호)", price: "100만 자당 미화 15달러", speedMin: 0.5, speedMax: 2 },
   ],
@@ -177,7 +177,6 @@ function clearTurnstileSessionExpiry() {
 
 function getStaticVoices(provider: ProviderId, model: string, gender: Gender) {
   if (provider === "google") {
-    if (GEMINI_MODELS.includes(model)) return GEMINI_VOICES[gender];
     return GOOGLE_VOICES[model as keyof typeof GOOGLE_VOICES][gender];
   }
   if (provider === "openrouter") return OPENROUTER_VOICES[model]?.[gender] ?? [];
@@ -285,7 +284,7 @@ function TtsApp() {
   const characterLimit = MAX_CHARACTERS;
   const characterCount = Array.from(text).length;
   const textByteCount = new TextEncoder().encode(text.trim()).length;
-  const hasGoogleCloudByteLimit = provider === "google" && !GEMINI_MODELS.includes(model);
+  const hasGoogleCloudByteLimit = provider === "google";
   const exceedsTextLimit = characterCount > characterLimit || (hasGoogleCloudByteLimit && textByteCount > GOOGLE_CLOUD_MAX_TEXT_BYTES);
   const selectedVoiceLabel = voices.find((voice) => voice.id === voiceName)?.name ?? voiceName;
   const audioMetadata = {
@@ -590,7 +589,7 @@ function TtsApp() {
               </button>
             ))}
           </div>
-          <p className="price-note">{modelInfo.price}{provider === "google" && <span> · {GEMINI_MODELS.includes(model) ? "Gemini API (제미나이 API)" : "Google Cloud TTS (구글 클라우드 음성 변환)"} 요금</span>}</p>
+          <p className="price-note">{modelInfo.price}{provider === "google" && <span> · Google Cloud TTS (구글 클라우드 음성 변환) 요금</span>}</p>
           {hasGoogleCloudByteLimit && <p className="provider-note">Google Cloud TTS API (구글 클라우드 음성 변환 API)는 요청당 최대 5,000바이트까지 받아요.</p>}
           {provider === "openrouter" && model === "fish-audio/s2.1-pro-free:free" && <p className="provider-note">Fish Audio (피시 오디오) 무료 모델이며 기본 음성을 사용합니다. 무료 제공과 처리량은 OpenRouter (오픈라우터)와 Fish Audio (피시 오디오)의 정책에 따라 달라질 수 있어요.</p>}
           {provider === "openrouter" && model === "microsoft/mai-voice-2-flash" && <p className="provider-note">OpenRouter (오픈라우터)를 통해 한국어 Haena (해나, 여성)·Junho (준호, 남성) 음성을 사용합니다.</p>}

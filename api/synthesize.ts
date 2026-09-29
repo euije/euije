@@ -53,12 +53,18 @@ const AZURE_VOICES: Record<Gender, readonly string[]> = {
   MALE: ["ko-KR-InJoonNeural", "ko-KR-BongJinNeural", "ko-KR-GookMinNeural", "ko-KR-HyunsuNeural"],
 };
 
-const GEMINI_TTS_MODELS = ["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"] as const;
+const OPENROUTER_GEMINI_MODELS = [
+  "google/gemini-3.8-flash-lite-tts",
+  "google/gemini-3.8-flash-tts",
+] as const;
 const OPENROUTER_MODELS = [
+  ...OPENROUTER_GEMINI_MODELS,
   "fish-audio/s2.1-pro-free:free",
   "microsoft/mai-voice-2-flash",
 ] as const;
 const OPENROUTER_VOICES: Record<string, Record<Gender, readonly string[]>> = {
+  "google/gemini-3.8-flash-lite-tts": GEMINI_VOICES,
+  "google/gemini-3.8-flash-tts": GEMINI_VOICES,
   "fish-audio/s2.1-pro-free:free": {
     FEMALE: ["fish-default"],
     MALE: ["fish-default"],
@@ -82,10 +88,10 @@ const GOOGLE_CLOUD_MAX_TEXT_BYTES = 5000;
 
 function getSpeedRange(provider: ProviderId, model: string): { min: number; max: number } | null {
   if (provider === "google") {
-    if ((GEMINI_TTS_MODELS as readonly string[]).includes(model)) return { min: 1, max: 1 };
     if (Object.prototype.hasOwnProperty.call(GOOGLE_VOICES, model)) return { min: 0.25, max: 2 };
   }
   if (provider === "openrouter") {
+    if ((OPENROUTER_GEMINI_MODELS as readonly string[]).includes(model)) return { min: 1, max: 1 };
     if (model === "fish-audio/s2.1-pro-free:free") return { min: 1, max: 1 };
     if (model === "microsoft/mai-voice-2-flash") return { min: 0.5, max: 2 };
   }
@@ -269,7 +275,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const model = typeof body.model === "string" ? body.model : "";
   if (
     provider === "google" &&
-    !(GEMINI_TTS_MODELS as readonly string[]).includes(model) &&
     Buffer.byteLength(text, "utf8") > GOOGLE_CLOUD_MAX_TEXT_BYTES
   ) {
     return fail(res, 400, "Google Cloud TTS (구글 클라우드 음성 변환)는 요청당 5,000바이트까지 지원해요.");
@@ -287,12 +292,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   }
 
   let voiceIsAllowed = false;
-  if (provider === "google" && (GEMINI_TTS_MODELS as readonly string[]).includes(model)) {
-    voiceIsAllowed = GEMINI_VOICES[gender].includes(voiceName);
-  } else if (provider === "google" && Object.prototype.hasOwnProperty.call(GOOGLE_VOICES, model)) {
+  if (provider === "google" && Object.prototype.hasOwnProperty.call(GOOGLE_VOICES, model)) {
     voiceIsAllowed = GOOGLE_VOICES[model as GoogleModel][gender].includes(voiceName);
   } else if (provider === "openrouter" && (OPENROUTER_MODELS as readonly string[]).includes(model)) {
-    voiceIsAllowed = OPENROUTER_VOICES[model][gender].includes(voiceName);
+    voiceIsAllowed = OPENROUTER_VOICES[model]?.[gender]?.includes(voiceName) ?? false;
   } else if (provider === "azure" && model === "neural") {
     voiceIsAllowed = AZURE_VOICES[gender].includes(voiceName);
   } else if (provider === "elevenlabs" && (ELEVENLABS_MODELS as readonly string[]).includes(model)) {
@@ -329,32 +332,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   try {
     if (provider === "google") {
-      if ((GEMINI_TTS_MODELS as readonly string[]).includes(model)) {
-        const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
-        if (!apiKey) return fail(res, 503, "Google Gemini API (구글 제미나이 API) 키를 서버 설정에 등록해 주세요.");
-        const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: JSON.stringify({
-            model,
-            input: [{
-              type: "user_input",
-              content: [{ type: "text", text, annotations: [{ type: "speech_metadata", style: "Read this Korean text naturally." }] }],
-            }],
-            response_format: { type: "audio", mime_type: "audio/wav" },
-            generation_config: { speech_config: [{ voice: voiceName }] },
-          }),
-        });
-        if (!geminiResponse.ok) return fail(res, 502, "Google Gemini (구글 제미나이)에서 음성을 만들지 못했어요. API 키와 모델 사용 권한을 확인해 주세요.");
-        const result = (await geminiResponse.json()) as { output_audio?: { data?: string } };
-        if (!result.output_audio?.data) return fail(res, 502, "Google Gemini (구글 제미나이) 음성 결과가 비어 있어요.");
-        const audio = Buffer.from(result.output_audio.data, "base64");
-        res.setHeader("Content-Type", "audio/wav");
-        res.setHeader("Content-Length", audio.byteLength);
-        res.setHeader("Content-Disposition", "inline; filename=voice.wav");
-        return res.status(200).send(audio);
-      }
-
       const apiKey = process.env.GOOGLE_TTS_API_KEY;
       if (!apiKey) return fail(res, 503, "Google Cloud (구글 클라우드) API 키를 서버 설정에 등록해 주세요.");
       const googleResponse = await fetch("https://texttospeech.googleapis.com/v1/text:synthesize", {

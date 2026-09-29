@@ -161,7 +161,7 @@ declare global {
           language?: string;
           callback: (token: string) => void;
           "expired-callback"?: () => void;
-          "error-callback"?: () => void;
+          "error-callback"?: (errorCode?: number | string) => void;
         },
       ) => string;
       remove: (widgetId: string) => void;
@@ -257,14 +257,19 @@ function TtsApp() {
         language: "ko",
         callback: setTurnstileToken,
         "expired-callback": () => setTurnstileToken(""),
-        "error-callback": () => setTurnstileToken(""),
+        "error-callback": (errorCode) => {
+          setTurnstileToken("");
+          setError(errorCode === 110200 || errorCode === "110200"
+            ? "현재 웹사이트 주소가 보안 확인 허용 목록에 없습니다. 관리자에게 문의해 주세요."
+            : "보안 확인을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.");
+        },
       });
       turnstileWidgetIdRef.current = widgetId;
     };
 
     if (!script) {
       script = document.createElement("script");
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&hl=ko";
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
       script.async = true;
       script.defer = true;
       script.dataset.turnstile = "true";

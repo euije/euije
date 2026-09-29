@@ -1,0 +1,1 @@
+Supertonic 3 model files are fetched at runtime from https://huggingface.co/Supertone/supertonic-3. The model uses the OpenRAIL-M license; review its current terms before using generated output: https://huggingface.co/Supertone/supertonic-3/blob/main/LICENSE

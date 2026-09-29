@@ -1,9 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-type ModelId = "standard" | "wavenet" | "neural2" | "chirp3hd";
+type ProviderId = "google" | "openrouter" | "azure" | "elevenlabs";
 type Gender = "FEMALE" | "MALE";
+type GoogleModel = "standard" | "wavenet" | "neural2" | "chirp3hd";
 
 type RequestBody = {
+  provider?: unknown;
   text?: unknown;
   model?: unknown;
   gender?: unknown;
@@ -21,7 +23,7 @@ type ApiResponse = ServerResponse & {
   send: (data: Buffer) => ApiResponse;
 };
 
-const VOICES: Record<ModelId, Record<Gender, readonly string[]>> = {
+const GOOGLE_VOICES: Record<GoogleModel, Record<Gender, readonly string[]>> = {
   standard: {
     FEMALE: ["ko-KR-Standard-A", "ko-KR-Standard-B"],
     MALE: ["ko-KR-Standard-C", "ko-KR-Standard-D"],
@@ -35,29 +37,29 @@ const VOICES: Record<ModelId, Record<Gender, readonly string[]>> = {
     MALE: ["ko-KR-Neural2-C"],
   },
   chirp3hd: {
-    FEMALE: [
-      "ko-KR-Chirp3-HD-Achernar", "ko-KR-Chirp3-HD-Aoede",
-      "ko-KR-Chirp3-HD-Autonoe", "ko-KR-Chirp3-HD-Callirrhoe",
-      "ko-KR-Chirp3-HD-Despina", "ko-KR-Chirp3-HD-Erinome",
-      "ko-KR-Chirp3-HD-Gacrux", "ko-KR-Chirp3-HD-Kore",
-      "ko-KR-Chirp3-HD-Laomedeia", "ko-KR-Chirp3-HD-Leda",
-      "ko-KR-Chirp3-HD-Pulcherrima", "ko-KR-Chirp3-HD-Sulafat",
-      "ko-KR-Chirp3-HD-Vindemiatrix", "ko-KR-Chirp3-HD-Zephyr",
-    ],
-    MALE: [
-      "ko-KR-Chirp3-HD-Achird", "ko-KR-Chirp3-HD-Algenib",
-      "ko-KR-Chirp3-HD-Algieba", "ko-KR-Chirp3-HD-Alnilam",
-      "ko-KR-Chirp3-HD-Charon", "ko-KR-Chirp3-HD-Enceladus",
-      "ko-KR-Chirp3-HD-Fenrir", "ko-KR-Chirp3-HD-Iapetus",
-      "ko-KR-Chirp3-HD-Orus", "ko-KR-Chirp3-HD-Puck",
-      "ko-KR-Chirp3-HD-Rasalgethi", "ko-KR-Chirp3-HD-Sadachbia",
-      "ko-KR-Chirp3-HD-Sadaltager", "ko-KR-Chirp3-HD-Schedar",
-      "ko-KR-Chirp3-HD-Umbriel", "ko-KR-Chirp3-HD-Zubenelgenubi",
-    ],
+    FEMALE: ["Achernar", "Aoede", "Autonoe", "Callirrhoe", "Despina", "Erinome", "Gacrux", "Kore", "Laomedeia", "Leda", "Pulcherrima", "Sulafat", "Vindemiatrix", "Zephyr"].map((name) => `ko-KR-Chirp3-HD-${name}`),
+    MALE: ["Achird", "Algenib", "Algieba", "Alnilam", "Charon", "Enceladus", "Fenrir", "Iapetus", "Orus", "Puck", "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Umbriel", "Zubenelgenubi"].map((name) => `ko-KR-Chirp3-HD-${name}`),
   },
 };
 
-// Secondary per-instance throttle. Turnstile is required for production deployments.
+const GEMINI_VOICES: Record<Gender, readonly string[]> = {
+  FEMALE: ["Achernar", "Aoede", "Autonoe", "Callirrhoe", "Despina", "Erinome", "Gacrux", "Kore", "Laomedeia", "Leda", "Pulcherrima", "Sulafat", "Vindemiatrix", "Zephyr"],
+  MALE: ["Achird", "Algenib", "Algieba", "Alnilam", "Charon", "Enceladus", "Fenrir", "Iapetus", "Orus", "Puck", "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Umbriel", "Zubenelgenubi"],
+};
+
+const AZURE_VOICES: Record<Gender, readonly string[]> = {
+  FEMALE: ["ko-KR-SunHiNeural", "ko-KR-JiMinNeural", "ko-KR-SeoHyeonNeural", "ko-KR-SoonBokNeural", "ko-KR-YuJinNeural"],
+  MALE: ["ko-KR-InJoonNeural", "ko-KR-BongJinNeural", "ko-KR-GookMinNeural", "ko-KR-HyunsuNeural"],
+};
+
+const OPENROUTER_MODELS = [
+  "google/gemini-3.8-flash-lite-tts",
+  "google/gemini-3.8-flash-tts",
+] as const;
+const ELEVENLABS_MODELS = ["eleven_multilingual_v2", "eleven_flash_v2_5"] as const;
+const CLOUD_PROVIDERS = new Set<ProviderId>(["google", "openrouter", "azure", "elevenlabs"]);
+
+// Secondary per-instance throttle. Turnstile is required on Vercel deployments.
 const recentRequests = new Map<string, number[]>();
 const WINDOW_MS = 10 * 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 8;
@@ -111,31 +113,69 @@ async function verifyTurnstile(token: string, ip: string) {
   return result.success === true;
 }
 
+function sameSiteRequest(req: ApiRequest) {
+  const origin = req.headers.origin;
+  if (typeof origin !== "string") return true;
+
+  const forwardedHost = req.headers["x-forwarded-host"];
+  const host = typeof forwardedHost === "string"
+    ? forwardedHost.split(",")[0].trim()
+    : req.headers.host;
+  if (typeof host !== "string") return false;
+
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
+function escapeXml(text: string) {
+  return text.replace(/[&<>"']/g, (character) => {
+    const replacements: Record<string, string> = {
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;",
+    };
+    return replacements[character];
+  });
+}
+
+async function isKoreanPremadeVoiceAllowed(apiKey: string, voiceId: string, gender: Gender) {
+  const query = new URLSearchParams({
+    language: "ko",
+    gender: gender.toLowerCase(),
+    category: "premade",
+    page_size: "100",
+    include_total_count: "false",
+  });
+  const response = await fetch(`https://api.elevenlabs.io/v2/voices?${query.toString()}`, {
+    headers: { "xi-api-key": apiKey },
+  });
+  if (!response.ok) return false;
+  const result = (await response.json()) as {
+    voices?: Array<{ voice_id?: string; labels?: Record<string, string> }>;
+  };
+  return (result.voices ?? []).some((voice) =>
+    voice.voice_id === voiceId && voice.labels?.gender?.toLowerCase() === gender.toLowerCase(),
+  );
+}
+
+async function sendAudio(upstream: Response, res: ApiResponse) {
+  if (!upstream.ok) return fail(res, 502, "음성을 만들지 못했어요. 설정과 입력 문장을 확인해 주세요.");
+  const audio = Buffer.from(await upstream.arrayBuffer());
+  if (audio.byteLength === 0) return fail(res, 502, "음성 결과가 비어 있어요. 다시 시도해 주세요.");
+  res.setHeader("Content-Type", "audio/mpeg");
+  res.setHeader("Content-Length", audio.byteLength);
+  res.setHeader("Content-Disposition", "inline; filename=voice.mp3");
+  return res.status(200).send(audio);
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return fail(res, 405, "지원하지 않는 요청이에요.");
   }
-
-  const originHeader = req.headers.origin;
-  const forwardedHostHeader = req.headers["x-forwarded-host"];
-  const hostHeader = typeof forwardedHostHeader === "string"
-    ? forwardedHostHeader.split(",")[0].trim()
-    : req.headers.host;
-
-  if (typeof originHeader === "string" && typeof hostHeader !== "string") {
-    return fail(res, 403, "요청 주소를 확인할 수 없어요.");
-  }
-  if (typeof originHeader === "string" && typeof hostHeader === "string") {
-    try {
-      if (new URL(originHeader).host !== hostHeader) {
-        return fail(res, 403, "이 사이트에서 보낸 요청만 처리할 수 있어요.");
-      }
-    } catch {
-      return fail(res, 403, "요청 주소를 확인할 수 없어요.");
-    }
-  }
+  if (!sameSiteRequest(req)) return fail(res, 403, "이 사이트에서 보낸 요청만 처리할 수 있어요.");
 
   const ip = getClientIp(req);
   if (!allowRequest(ip, Date.now())) {
@@ -150,14 +190,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       return fail(res, 400, "요청 내용을 읽지 못했어요.");
     }
   }
-  if (!body || typeof body !== "object") {
-    return fail(res, 400, "요청 내용을 확인해 주세요.");
-  }
-
-  if (typeof body.website === "string" && body.website.trim()) {
-    return fail(res, 400, "요청을 처리할 수 없어요.");
-  }
-
+  if (!body || typeof body !== "object") return fail(res, 400, "요청 내용을 확인해 주세요.");
+  if (typeof body.website === "string" && body.website.trim()) return fail(res, 400, "요청을 처리할 수 없어요.");
   if (typeof body.elapsedMs !== "number" || !Number.isFinite(body.elapsedMs) || body.elapsedMs < 1200) {
     return fail(res, 400, "잠시 후 다시 시도해 주세요.");
   }
@@ -168,20 +202,30 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return fail(res, 400, `한 번에 ${MAX_CHARACTERS.toLocaleString()}자까지 만들 수 있어요.`);
   }
 
-  const model = body.model as ModelId;
+  const provider = body.provider as ProviderId;
+  const model = typeof body.model === "string" ? body.model : "";
   const gender = body.gender as Gender;
   const voiceName = typeof body.voiceName === "string" ? body.voiceName : "";
   const speakingRate = body.speakingRate;
+  if (!CLOUD_PROVIDERS.has(provider)) {
+    return fail(res, 400, "선택한 음성 서비스를 사용할 수 없어요.");
+  }
+  if (!(gender === "FEMALE" || gender === "MALE")) return fail(res, 400, "음성 성별을 다시 확인해 주세요.");
+  if (typeof speakingRate !== "number" || !Number.isFinite(speakingRate) || speakingRate < 0.7 || speakingRate > 1.2) {
+    return fail(res, 400, "속도는 0.7배에서 1.2배 사이로 설정해 주세요.");
+  }
 
-  if (!Object.prototype.hasOwnProperty.call(VOICES, model) || !(gender === "FEMALE" || gender === "MALE")) {
-    return fail(res, 400, "음성 설정을 다시 확인해 주세요.");
+  let voiceIsAllowed = false;
+  if (provider === "google" && Object.prototype.hasOwnProperty.call(GOOGLE_VOICES, model)) {
+    voiceIsAllowed = GOOGLE_VOICES[model as GoogleModel][gender].includes(voiceName);
+  } else if (provider === "openrouter" && (OPENROUTER_MODELS as readonly string[]).includes(model)) {
+    voiceIsAllowed = GEMINI_VOICES[gender].includes(voiceName);
+  } else if (provider === "azure" && model === "neural") {
+    voiceIsAllowed = AZURE_VOICES[gender].includes(voiceName);
+  } else if (provider === "elevenlabs" && (ELEVENLABS_MODELS as readonly string[]).includes(model)) {
+    voiceIsAllowed = /^[A-Za-z0-9_-]{8,100}$/.test(voiceName);
   }
-  if (!VOICES[model][gender].includes(voiceName)) {
-    return fail(res, 400, "선택한 음성을 사용할 수 없어요.");
-  }
-  if (typeof speakingRate !== "number" || !Number.isFinite(speakingRate) || speakingRate < 0.6 || speakingRate > 1.4) {
-    return fail(res, 400, "속도는 0.6배에서 1.4배 사이로 설정해 주세요.");
-  }
+  if (!voiceIsAllowed) return fail(res, 400, "선택한 모델이나 음성을 사용할 수 없어요.");
 
   try {
     if (process.env.VERCEL && !process.env.TURNSTILE_SECRET_KEY) {
@@ -196,40 +240,90 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return fail(res, 503, "보안 확인을 할 수 없어요. 잠시 후 다시 시도해 주세요.");
   }
 
-  const apiKey = process.env.GOOGLE_TTS_API_KEY;
-  if (!apiKey) {
-    return fail(res, 503, "음성 서비스 설정이 필요해요. 운영자에게 문의해 주세요.");
-  }
-
   try {
-    const googleResponse = await fetch("https://texttospeech.googleapis.com/v1/text:synthesize", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey,
-      },
-      body: JSON.stringify({
-        input: { text },
-        voice: { languageCode: "ko-KR", name: voiceName },
-        audioConfig: {
-          audioEncoding: "MP3",
-          speakingRate,
-        },
-      }),
-    });
-
-    if (!googleResponse.ok) {
-      return fail(res, 502, "음성을 만들지 못했어요. 모델이나 입력 문장을 확인해 주세요.");
+    if (provider === "google") {
+      const apiKey = process.env.GOOGLE_TTS_API_KEY;
+      if (!apiKey) return fail(res, 503, "Google Cloud API 키를 서버 환경 변수에 설정해 주세요.");
+      const googleResponse = await fetch("https://texttospeech.googleapis.com/v1/text:synthesize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey },
+        body: JSON.stringify({
+          input: { text },
+          voice: { languageCode: "ko-KR", name: voiceName },
+          audioConfig: { audioEncoding: "MP3", speakingRate },
+        }),
+      });
+      if (!googleResponse.ok) return fail(res, 502, "Google Cloud에서 음성을 만들지 못했어요.");
+      const result = (await googleResponse.json()) as { audioContent?: string };
+      if (!result.audioContent) return fail(res, 502, "Google Cloud 음성 결과가 비어 있어요.");
+      const audio = Buffer.from(result.audioContent, "base64");
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Length", audio.byteLength);
+      res.setHeader("Content-Disposition", "inline; filename=voice.mp3");
+      return res.status(200).send(audio);
     }
 
-    const result = (await googleResponse.json()) as { audioContent?: string };
-    if (!result.audioContent) return fail(res, 502, "음성 결과가 비어 있어요. 다시 시도해 주세요.");
+    if (provider === "openrouter") {
+      const apiKey = process.env.OPENROUTER_API_KEY;
+      if (!apiKey) return fail(res, 503, "OpenRouter API 키를 서버 환경 변수에 설정해 주세요.");
+      const openRouterResponse = await fetch("https://openrouter.ai/api/v1/audio/speech", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          input: text,
+          voice: voiceName,
+          response_format: "mp3",
+          speed: speakingRate,
+          provider: {
+            options: {
+              "google-ai-studio": {
+                speech_metadata: { style: `Read this Korean text at approximately ${speakingRate.toFixed(2)} times the normal speaking speed.` },
+              },
+            },
+          },
+        }),
+      });
+      return await sendAudio(openRouterResponse, res);
+    }
 
-    const audio = Buffer.from(result.audioContent, "base64");
-    res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Content-Length", audio.byteLength);
-    res.setHeader("Content-Disposition", "inline; filename=voice.mp3");
-    return res.status(200).send(audio);
+    if (provider === "azure") {
+      const apiKey = process.env.AZURE_SPEECH_KEY;
+      if (!apiKey) return fail(res, 503, "Azure Speech 키를 서버 환경 변수에 설정해 주세요.");
+      const region = (process.env.AZURE_SPEECH_REGION || "koreacentral").toLowerCase();
+      if (!/^[a-z0-9-]+$/.test(region)) return fail(res, 500, "Azure Speech 지역 설정을 확인해 주세요.");
+      const ssml = `<speak version="1.0" xml:lang="ko-KR"><voice name="${voiceName}" xml:lang="ko-KR"><prosody rate="${Math.round((speakingRate - 1) * 100)}%">${escapeXml(text)}</prosody></voice></speak>`;
+      const azureResponse = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+        method: "POST",
+        headers: {
+          "Ocp-Apim-Subscription-Key": apiKey,
+          "Content-Type": "application/ssml+xml",
+          "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
+          "User-Agent": "sorigyeol",
+        },
+        body: ssml,
+      });
+      return await sendAudio(azureResponse, res);
+    }
+
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) return fail(res, 503, "ElevenLabs API 키를 서버 환경 변수에 설정해 주세요.");
+    if (!await isKoreanPremadeVoiceAllowed(apiKey, voiceName, gender)) {
+      return fail(res, 400, "한국어 기본 음성 목록에서 목소리를 선택해 주세요.");
+    }
+    const elevenLabsResponse = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceName)}?output_format=mp3_44100_128`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "xi-api-key": apiKey },
+        body: JSON.stringify({
+          text,
+          model_id: model,
+          voice_settings: { speed: speakingRate },
+        }),
+      },
+    );
+    return await sendAudio(elevenLabsResponse, res);
   } catch {
     return fail(res, 502, "음성 서비스에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
   }

@@ -121,7 +121,6 @@ const MODEL_OPTIONS: Record<ProviderId, ModelChoice[]> = {
   ],
   openrouter: [
     { id: "google/gemini-3.8-flash-lite-tts", label: "Gemini 3.8 Flash-Lite TTS (제미나이 고속·경량 음성)", detail: "빠르고 비용 효율적", price: "입력 100만 토큰당 미화 0.50달러 · 음성 출력 100만 토큰당 미화 6달러", supportsSpeed: false },
-    { id: "google/gemini-3.8-flash-tts", label: "Gemini 3.8 Flash TTS (제미나이 고음질 음성)", detail: "표현력과 음성 품질 중심", price: "입력 100만 토큰당 미화 0.50달러 · 음성 출력 100만 토큰당 미화 9달러", supportsSpeed: false },
     { id: "fish-audio/s2.1-pro-free:free", label: "Fish Audio S2.1 Pro Free (피시 오디오 S2.1 프로 무료 모델)", detail: "무료 · 한국어 포함 83개 언어", price: "무료 · 사용량 정책 적용", supportsSpeed: false },
     { id: "microsoft/mai-voice-2-flash", label: "MAI Voice-2 Flash (마이 음성 2 플래시)", detail: "한국어 Haena (해나) · Junho (준호)", price: "100만 자당 미화 15달러", speedMin: 0.5, speedMax: 2 },
   ],

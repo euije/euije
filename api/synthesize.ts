@@ -52,10 +52,21 @@ const AZURE_VOICES: Record<Gender, readonly string[]> = {
   MALE: ["ko-KR-InJoonNeural", "ko-KR-BongJinNeural", "ko-KR-GookMinNeural", "ko-KR-HyunsuNeural"],
 };
 
+const GEMINI_TTS_MODELS = ["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"] as const;
 const OPENROUTER_MODELS = [
-  "google/gemini-3.8-flash-lite-tts",
-  "google/gemini-3.8-flash-tts",
+  "fish-audio/s2.1-pro-free:free",
+  "microsoft/mai-voice-2-flash",
 ] as const;
+const OPENROUTER_VOICES: Record<string, Record<Gender, readonly string[]>> = {
+  "fish-audio/s2.1-pro-free:free": {
+    FEMALE: ["fish-default"],
+    MALE: ["fish-default"],
+  },
+  "microsoft/mai-voice-2-flash": {
+    FEMALE: ["ko-KR-Haena:MAI-Voice-2-Flash"],
+    MALE: ["ko-KR-Junho:MAI-Voice-2-Flash"],
+  },
+};
 const ELEVENLABS_MODELS = ["eleven_multilingual_v2", "eleven_flash_v2_5"] as const;
 const CLOUD_PROVIDERS = new Set<ProviderId>(["google", "openrouter", "azure", "elevenlabs"]);
 
@@ -216,10 +227,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   }
 
   let voiceIsAllowed = false;
-  if (provider === "google" && Object.prototype.hasOwnProperty.call(GOOGLE_VOICES, model)) {
+  if (provider === "google" && (GEMINI_TTS_MODELS as readonly string[]).includes(model)) {
+    voiceIsAllowed = GEMINI_VOICES[gender].includes(voiceName);
+  } else if (provider === "google" && Object.prototype.hasOwnProperty.call(GOOGLE_VOICES, model)) {
     voiceIsAllowed = GOOGLE_VOICES[model as GoogleModel][gender].includes(voiceName);
   } else if (provider === "openrouter" && (OPENROUTER_MODELS as readonly string[]).includes(model)) {
-    voiceIsAllowed = GEMINI_VOICES[gender].includes(voiceName);
+    voiceIsAllowed = OPENROUTER_VOICES[model][gender].includes(voiceName);
   } else if (provider === "azure" && model === "neural") {
     voiceIsAllowed = AZURE_VOICES[gender].includes(voiceName);
   } else if (provider === "elevenlabs" && (ELEVENLABS_MODELS as readonly string[]).includes(model)) {
@@ -242,6 +255,32 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   try {
     if (provider === "google") {
+      if ((GEMINI_TTS_MODELS as readonly string[]).includes(model)) {
+        const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_TTS_API_KEY;
+        if (!apiKey) return fail(res, 503, "Google Gemini API 키를 서버 환경 변수에 설정해 주세요.");
+        const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: JSON.stringify({
+            model,
+            input: [{
+              type: "user_input",
+              content: [{ type: "text", text, annotations: [{ type: "speech_metadata", style: "Read this Korean text naturally." }] }],
+            }],
+            response_format: { type: "audio", mime_type: "audio/wav" },
+            generation_config: { speech_config: [{ voice: voiceName }] },
+          }),
+        });
+        if (!geminiResponse.ok) return fail(res, 502, "Google Gemini에서 음성을 만들지 못했어요. API 키와 모델 사용 권한을 확인해 주세요.");
+        const result = (await geminiResponse.json()) as { output_audio?: { data?: string } };
+        if (!result.output_audio?.data) return fail(res, 502, "Google Gemini 음성 결과가 비어 있어요.");
+        const audio = Buffer.from(result.output_audio.data, "base64");
+        res.setHeader("Content-Type", "audio/wav");
+        res.setHeader("Content-Length", audio.byteLength);
+        res.setHeader("Content-Disposition", "inline; filename=voice.wav");
+        return res.status(200).send(audio);
+      }
+
       const apiKey = process.env.GOOGLE_TTS_API_KEY;
       if (!apiKey) return fail(res, 503, "Google Cloud API 키를 서버 환경 변수에 설정해 주세요.");
       const googleResponse = await fetch("https://texttospeech.googleapis.com/v1/text:synthesize", {
@@ -266,22 +305,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (provider === "openrouter") {
       const apiKey = process.env.OPENROUTER_API_KEY;
       if (!apiKey) return fail(res, 503, "OpenRouter API 키를 서버 환경 변수에 설정해 주세요.");
+      const usesDefaultVoice = model === "fish-audio/s2.1-pro-free:free";
       const openRouterResponse = await fetch("https://openrouter.ai/api/v1/audio/speech", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
           model,
           input: text,
-          voice: voiceName,
+          ...(!usesDefaultVoice && { voice: voiceName }),
           response_format: "mp3",
-          speed: speakingRate,
-          provider: {
-            options: {
-              "google-ai-studio": {
-                speech_metadata: { style: `Read this Korean text at approximately ${speakingRate.toFixed(2)} times the normal speaking speed.` },
-              },
-            },
-          },
+          ...(model === "microsoft/mai-voice-2-flash" && { speed: speakingRate }),
         }),
       });
       return await sendAudio(openRouterResponse, res);

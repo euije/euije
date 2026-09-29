@@ -1,16 +1,6 @@
 import { loadTextToSpeech, loadVoiceStyle, writeWavFile } from "./vendor/supertonic/helper";
 import * as ort from "onnxruntime-web/webgpu";
-import {
-  ALL_FORMATS,
-  BlobSource,
-  BufferTarget,
-  Conversion,
-  Input,
-  Mp3OutputFormat,
-  Output,
-  canEncodeAudio,
-} from "mediabunny";
-import { registerMp3Encoder } from "@mediabunny/mp3-encoder";
+import { wavToMp3 } from "./audio";
 
 const MODEL_REVISION = "3cadd1ee6394adea1bd021217a0e650ede09a323";
 const MODEL_ROOT = `https://huggingface.co/Supertone/supertonic-3/resolve/${MODEL_REVISION}`;
@@ -49,21 +39,6 @@ function loadStyle(voiceName: string) {
     stylePromises.set(voiceName, stylePromise);
   }
   return stylePromise;
-}
-
-async function wavToMp3(wavBuffer: ArrayBuffer) {
-  if (!(await canEncodeAudio("mp3"))) registerMp3Encoder();
-
-  const input = new Input({
-    source: new BlobSource(new Blob([wavBuffer], { type: "audio/wav" })),
-    formats: ALL_FORMATS,
-  });
-  const target = new BufferTarget();
-  const output = new Output({ format: new Mp3OutputFormat(), target });
-  const conversion = await Conversion.init({ input, output });
-  await conversion.execute();
-  if (!target.buffer) throw new Error("MP3 변환 결과를 만들지 못했어요.");
-  return new Blob([target.buffer], { type: "audio/mpeg" });
 }
 
 export async function synthesizeSupertonicMp3(

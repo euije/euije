@@ -39,7 +39,20 @@ const AZURE_VOICES: Record<Gender, Voice[]> = {
   MALE: ["InJoon", "BongJin", "GookMin", "Hyunsu"].map((name) => ({ id: `ko-KR-${name}Neural`, name })),
 };
 
-type ModelChoice = { id: string; label: string; detail: string; price: string };
+const GEMINI_MODELS = ["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"];
+
+type ModelChoice = { id: string; label: string; detail: string; price: string; supportsSpeed?: boolean };
+
+const OPENROUTER_VOICES: Record<string, Record<Gender, Voice[]>> = {
+  "fish-audio/s2.1-pro-free:free": {
+    FEMALE: [{ id: "fish-default", name: "모델 기본 음성" }],
+    MALE: [{ id: "fish-default", name: "모델 기본 음성" }],
+  },
+  "microsoft/mai-voice-2-flash": {
+    FEMALE: [{ id: "ko-KR-Haena:MAI-Voice-2-Flash", name: "Haena" }],
+    MALE: [{ id: "ko-KR-Junho:MAI-Voice-2-Flash", name: "Junho" }],
+  },
+};
 
 const MODEL_OPTIONS: Record<ProviderId, ModelChoice[]> = {
   google: [
@@ -47,10 +60,12 @@ const MODEL_OPTIONS: Record<ProviderId, ModelChoice[]> = {
     { id: "neural2", label: "Neural2", detail: "균형 잡힌 음성", price: "월 100만 자 무료 · 이후 $16 / 100만 자" },
     { id: "wavenet", label: "WaveNet", detail: "자연스러운 합성 음성", price: "월 100만 자 무료 · 이후 $16 / 100만 자" },
     { id: "chirp3hd", label: "Chirp 3 HD", detail: "생성형 음성", price: "월 100만 자 무료 · 이후 $30 / 100만 자" },
+    { id: "gemini-3.8-flash-lite-tts", label: "Gemini Flash-Lite TTS", detail: "빠르고 비용 효율적", price: "Gemini API 종량제 · 토큰 기준", supportsSpeed: false },
+    { id: "gemini-3.8-flash-tts", label: "Gemini Flash TTS", detail: "표현력 중심", price: "Gemini API 종량제 · 토큰 기준", supportsSpeed: false },
   ],
   openrouter: [
-    { id: "google/gemini-3.8-flash-lite-tts", label: "Gemini Flash Lite", detail: "빠르고 비용 효율적", price: "텍스트 $0.50 · 오디오 $6 / 100만 토큰" },
-    { id: "google/gemini-3.8-flash-tts", label: "Gemini Flash TTS", detail: "표현력 중심", price: "텍스트 $0.50 · 오디오 $9 / 100만 토큰" },
+    { id: "fish-audio/s2.1-pro-free:free", label: "Fish Audio S2.1 Pro Free", detail: "무료 · 한국어 포함 83개 언어", price: "무료 · 사용량 정책 적용", supportsSpeed: false },
+    { id: "microsoft/mai-voice-2-flash", label: "MAI Voice-2 Flash", detail: "한국어 Haena · Junho", price: "$15 / 100만 자" },
   ],
   azure: [
     { id: "neural", label: "Azure Neural", detail: "한국어 신경망 음성", price: "Azure 종량제 · 지역별 요금" },
@@ -65,7 +80,7 @@ const MODEL_OPTIONS: Record<ProviderId, ModelChoice[]> = {
 };
 
 const PROVIDERS: { id: ProviderId; label: string }[] = [
-  { id: "google", label: "Google Cloud" },
+  { id: "google", label: "Google Cloud · Gemini API" },
   { id: "openrouter", label: "OpenRouter" },
   { id: "azure", label: "Azure Speech" },
   { id: "elevenlabs", label: "ElevenLabs" },
@@ -79,7 +94,7 @@ const SUPERTONIC_VOICES: Record<Gender, Voice[]> = {
 
 const DEFAULT_MODELS: Record<ProviderId, string> = {
   google: "neural2",
-  openrouter: "google/gemini-3.8-flash-lite-tts",
+  openrouter: "microsoft/mai-voice-2-flash",
   azure: "neural",
   elevenlabs: "eleven_multilingual_v2",
   supertonic: "supertonic-3",
@@ -90,8 +105,11 @@ const SUPERTONIC_MAX_CHARACTERS = 500;
 const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY;
 
 function getStaticVoices(provider: ProviderId, model: string, gender: Gender) {
-  if (provider === "google") return GOOGLE_VOICES[model as keyof typeof GOOGLE_VOICES][gender];
-  if (provider === "openrouter") return GEMINI_VOICES[gender];
+  if (provider === "google") {
+    if (GEMINI_MODELS.includes(model)) return GEMINI_VOICES[gender];
+    return GOOGLE_VOICES[model as keyof typeof GOOGLE_VOICES][gender];
+  }
+  if (provider === "openrouter") return OPENROUTER_VOICES[model]?.[gender] ?? [];
   if (provider === "azure") return AZURE_VOICES[gender];
   if (provider === "supertonic") return SUPERTONIC_VOICES[gender];
   return [];
@@ -170,6 +188,8 @@ function App() {
   const turnstileWidgetIdRef = useRef<string | undefined>(undefined);
   const modelOptions = MODEL_OPTIONS[provider];
   const modelInfo = modelOptions.find((item) => item.id === model) ?? modelOptions[0];
+  const speedSupported = modelInfo.supportsSpeed !== false;
+  const genderSupported = !(provider === "openrouter" && model === "fish-audio/s2.1-pro-free:free");
   const voices = provider === "elevenlabs" ? elevenVoices : getStaticVoices(provider, model, gender);
   const characterLimit = provider === "supertonic" ? SUPERTONIC_MAX_CHARACTERS : MAX_CHARACTERS;
   const characterCount = Array.from(text).length;
@@ -315,8 +335,12 @@ function App() {
         throw new Error(result.error || "음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
       }
 
-      const audioBlob = await response.blob();
+      let audioBlob = await response.blob();
       if (!audioBlob.size) throw new Error("음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
+      if (response.headers.get("content-type")?.includes("audio/wav")) {
+        const { wavToMp3 } = await import("./audio");
+        audioBlob = await wavToMp3(await audioBlob.arrayBuffer());
+      }
       setAudioUrl(URL.createObjectURL(audioBlob));
     } catch (caught) {
       setError(
@@ -415,8 +439,9 @@ function App() {
               </button>
             ))}
           </div>
-          <p className="price-note">{modelInfo.price}{provider === "google" && <span> · USD, Google Cloud 기준</span>}</p>
-          {provider === "openrouter" && <p className="provider-note">한국어 Gemini TTS를 OpenRouter API로 호출해요. 속도는 음성 지시로 반영됩니다.</p>}
+          <p className="price-note">{modelInfo.price}{provider === "google" && <span> · USD, {GEMINI_MODELS.includes(model) ? "Gemini API" : "Google Cloud TTS"} 기준</span>}</p>
+          {provider === "openrouter" && model === "fish-audio/s2.1-pro-free:free" && <p className="provider-note">무료 모델이며 기본 음성을 사용합니다. 무료 제공과 처리량은 OpenRouter·Fish Audio의 정책에 따라 달라질 수 있어요.</p>}
+          {provider === "openrouter" && model === "microsoft/mai-voice-2-flash" && <p className="provider-note">OpenRouter를 통해 한국어 Haena(여성)·Junho(남성) 음성을 사용합니다.</p>}
           {provider === "supertonic" && <p className="provider-note">첫 실행 때 약 400MB를 내려받아요. <a href="https://huggingface.co/Supertone/supertonic-3" target="_blank" rel="noreferrer">모델 이용 조건</a>을 확인해 주세요.</p>}
           {provider !== "supertonic" && <p className="provider-note">입력 문장은 선택한 TTS 서비스로 전송돼요.</p>}
         </div>
@@ -425,18 +450,21 @@ function App() {
           <div className="field-block gender-field">
             <div className="field-heading">
               <label>성별</label>
+              {!genderSupported && <span className="field-hint">모델 기본 음성 사용</span>}
             </div>
-            <div className="segmented-control" role="group" aria-label="음성 성별">
+            <div className="segmented-control" role="group" aria-label="음성 성별" aria-disabled={!genderSupported}>
               <button
                 type="button"
                 className={gender === "FEMALE" ? "active" : ""}
                 aria-pressed={gender === "FEMALE"}
+                disabled={!genderSupported}
                 onClick={() => chooseGender("FEMALE")}
               >여성</button>
               <button
                 type="button"
                 className={gender === "MALE" ? "active" : ""}
                 aria-pressed={gender === "MALE"}
+                disabled={!genderSupported}
                 onClick={() => chooseGender("MALE")}
               >남성</button>
             </div>
@@ -470,7 +498,7 @@ function App() {
         <div className="field-block speed-block">
           <div className="field-heading speed-heading">
             <label htmlFor="speed">말하기 속도</label>
-            <span className="speed-value">{speed.toFixed(2).replace(/0$/, "")}×</span>
+            <span className="speed-value">{speedSupported ? `${speed.toFixed(2).replace(/0$/, "")}×` : "모델 기본"}</span>
           </div>
           <input
             id="speed"
@@ -480,6 +508,7 @@ function App() {
             max="1.2"
             step="0.05"
             value={speed}
+            disabled={!speedSupported}
             onChange={(event) => {
               setSpeed(Number(event.target.value));
               setAudioUrl(null);
@@ -567,7 +596,7 @@ function App() {
           <div className="audio-result" aria-live="polite">
             <div className="result-title">
               <span className="result-icon"><Icon name="play" /></span>
-              <div><strong>음성이 준비됐어요</strong><span>MP3 · {providerInfoLabel(provider)} · {modelInfo.label} · {speed.toFixed(2)}×</span></div>
+              <div><strong>음성이 준비됐어요</strong><span>MP3 · {providerInfoLabel(provider)} · {modelInfo.label} · {speedSupported ? `${speed.toFixed(2)}×` : "기본 속도"}</span></div>
             </div>
             <audio controls src={audioUrl} aria-label="생성된 음성 미리 듣기" />
             <a

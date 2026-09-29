@@ -82,6 +82,23 @@ type ModelChoice = {
   speedStep?: number;
 };
 
+type ScriptPart = {
+  id: string;
+  text: string;
+  audioUrl: string | null;
+  downloadUrl: string | null;
+  isLoading: boolean;
+  error: string;
+};
+
+type ScriptGroup = {
+  id: string;
+  sourceName: string;
+  kind: "manual" | "file" | "sample";
+  sourceText: string;
+  parts: ScriptPart[];
+};
+
 const OPENROUTER_VOICES: Record<string, Record<Gender, Voice[]>> = {
   "google/gemini-3.8-flash-tts": GEMINI_VOICES,
   "google/gemini-3.8-flash-lite-tts": GEMINI_VOICES,
@@ -142,13 +159,106 @@ const DEFAULT_MODELS: Record<ProviderId, string> = {
 
 const MAX_CHARACTERS = 5000;
 const GOOGLE_CLOUD_MAX_TEXT_BYTES = 5000;
+const UTF8_ENCODER = new TextEncoder();
 const SAMPLE_SENTENCES = [
   "안녕하세요. 오늘도 천천히, 편안한 하루 보내세요.",
   "따뜻한 차 한 잔과 함께 잠시 쉬어 가도 괜찮아요.",
   "오늘 할 일을 하나씩 마치면 하루가 한결 가벼워질 거예요.",
 ];
+const SPLIT_TEST_TEXT = Array.from({ length: 180 }, (_, index) =>
+  `${index + 1}번째 문장입니다. 편안한 목소리로 읽을 수 있도록 긴 문장 분할을 확인합니다.`,
+).join(" ");
 const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY;
 const TURNSTILE_SESSION_STORAGE_KEY = "tts-turnstile-session-expires";
+
+function createId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function createScriptPart(text: string): ScriptPart {
+  return { id: createId("part"), text, audioUrl: null, downloadUrl: null, isLoading: false, error: "" };
+}
+
+function splitTextIntoChunks(text: string, provider: ProviderId) {
+  const characters = Array.from(text.replace(/\r\n?/g, "\n").trim());
+  if (!characters.length) return [""];
+
+  const maxBytes = provider === "google" ? GOOGLE_CLOUD_MAX_TEXT_BYTES : Number.POSITIVE_INFINITY;
+  const byteLengths = characters.map((character) => UTF8_ENCODER.encode(character).length);
+  const chunks: string[] = [];
+  let start = 0;
+
+  while (start < characters.length) {
+    let end = start;
+    let bytes = 0;
+    while (end < characters.length && end - start < MAX_CHARACTERS && bytes + byteLengths[end] <= maxBytes) {
+      bytes += byteLengths[end];
+      end += 1;
+    }
+    if (end === start) end += 1;
+    let cut = end;
+
+    if (end < characters.length) {
+      for (let index = end - 1; index > start; index -= 1) {
+        if (/[.!?。！？\n]/.test(characters[index])) {
+          cut = index + 1;
+          break;
+        }
+      }
+      if (cut === end) {
+        for (let index = end - 1; index > start; index -= 1) {
+          if (/\s/.test(characters[index])) {
+            cut = index;
+            break;
+          }
+        }
+      }
+      if (cut <= start) cut = end;
+    }
+
+    const chunk = characters.slice(start, cut).join("").trim();
+    if (chunk) chunks.push(chunk);
+    start = cut;
+    while (start < characters.length && /\s/.test(characters[start])) start += 1;
+  }
+
+  return chunks.length ? chunks : [""];
+}
+
+function createScriptGroup(sourceName: string, kind: ScriptGroup["kind"], sourceText: string, provider: ProviderId): ScriptGroup {
+  return {
+    id: createId(kind),
+    sourceName,
+    kind,
+    sourceText,
+    parts: splitTextIntoChunks(sourceText, provider).map(createScriptPart),
+  };
+}
+
+function textExceedsLimit(text: string, provider: ProviderId) {
+  const trimmed = text.trim();
+  return Array.from(trimmed).length > MAX_CHARACTERS || (
+    provider === "google" && UTF8_ENCODER.encode(trimmed).length > GOOGLE_CLOUD_MAX_TEXT_BYTES
+  );
+}
+
+async function readTextFile(file: File) {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let text: string;
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+    text = new TextDecoder("utf-16le").decode(bytes.subarray(2));
+  } else if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    text = new TextDecoder("utf-16be").decode(bytes.subarray(2));
+  } else {
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+    } catch {
+      text = new TextDecoder("euc-kr").decode(buffer);
+    }
+  }
+  return text.replace(/^\uFEFF/, "");
+}
 
 function readTurnstileSessionExpiry() {
   try {
@@ -253,17 +363,17 @@ function App() {
 }
 
 function TtsApp() {
-  const [text, setText] = useState("");
+  const [scriptGroups, setScriptGroups] = useState<ScriptGroup[]>(() => [createScriptGroup("", "manual", "", "google")]);
   const [provider, setProvider] = useState<ProviderId>("google");
   const [model, setModel] = useState(DEFAULT_MODELS.google);
   const [gender, setGender] = useState<Gender>("FEMALE");
   const [voiceName, setVoiceName] = useState(GOOGLE_VOICES.neural2.FEMALE[0].id);
   const [speed, setSpeed] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [isReadingFiles, setIsReadingFiles] = useState(false);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [generationNote, setGenerationNote] = useState("");
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [elevenVoices, setElevenVoices] = useState<Voice[]>([]);
   const [honeypot, setHoneypot] = useState("");
@@ -271,7 +381,9 @@ function TtsApp() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileSessionExpiresAt, setTurnstileSessionExpiresAt] = useState(readTurnstileSessionExpiry);
   const turnstileRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const turnstileWidgetIdRef = useRef<string | undefined>(undefined);
+  const objectUrlsRef = useRef(new Set<string>());
   const modelOptions = MODEL_OPTIONS[provider];
   const modelInfo = modelOptions.find((item) => item.id === model) ?? modelOptions[0];
   const speedSupported = modelInfo.supportsSpeed !== false;
@@ -282,24 +394,8 @@ function TtsApp() {
   const hasTurnstileSession = turnstileSessionExpiresAt > Date.now();
   const voices = provider === "elevenlabs" ? elevenVoices : getStaticVoices(provider, model, gender);
   const characterLimit = MAX_CHARACTERS;
-  const characterCount = Array.from(text).length;
-  const textByteCount = new TextEncoder().encode(text.trim()).length;
   const hasGoogleCloudByteLimit = provider === "google";
-  const exceedsTextLimit = characterCount > characterLimit || (hasGoogleCloudByteLimit && textByteCount > GOOGLE_CLOUD_MAX_TEXT_BYTES);
   const selectedVoiceLabel = voices.find((voice) => voice.id === voiceName)?.name ?? voiceName;
-  const audioMetadata = {
-    text: text.trim(),
-    service: providerInfoLabel(provider),
-    model: modelInfo.label,
-    gender: genderSupported ? (gender === "FEMALE" ? "여성" : "남성") : "모델 기본",
-    voice: selectedVoiceLabel,
-  };
-  const downloadFilename = createMp3Filename(audioMetadata);
-
-  useEffect(() => {
-    if (!audioUrl) return;
-    return () => URL.revokeObjectURL(audioUrl);
-  }, [audioUrl]);
 
   useEffect(() => {
     if (turnstileSessionExpiresAt <= 0) return;
@@ -316,17 +412,39 @@ function TtsApp() {
   }, [turnstileSessionExpiresAt]);
 
   useEffect(() => {
-    if (!downloadUrl) return;
-    return () => URL.revokeObjectURL(downloadUrl);
-  }, [downloadUrl]);
-
-  useEffect(() => {
     setSpeed((current) => Math.min(speedMax, Math.max(speedMin, current)));
   }, [speedMin, speedMax]);
 
+  useEffect(() => () => {
+    Array.from(objectUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+    objectUrlsRef.current.clear();
+  }, []);
+
+  const createTrackedUrl = (blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    objectUrlsRef.current.add(url);
+    return url;
+  };
+
+  const revokeTrackedUrl = (url: string | null) => {
+    if (!url || !objectUrlsRef.current.has(url)) return;
+    URL.revokeObjectURL(url);
+    objectUrlsRef.current.delete(url);
+  };
+
+  const clearPartAudio = (part: ScriptPart) => {
+    revokeTrackedUrl(part.audioUrl);
+    revokeTrackedUrl(part.downloadUrl);
+  };
+
   const clearAudio = () => {
-    setAudioUrl(null);
-    setDownloadUrl(null);
+    for (const group of scriptGroups) {
+      for (const part of group.parts) clearPartAudio(part);
+    }
+    setScriptGroups((current) => current.map((group) => ({
+      ...group,
+      parts: group.parts.map((part) => ({ ...part, audioUrl: null, downloadUrl: null, error: "" })),
+    })));
   };
 
   useEffect(() => {
@@ -404,10 +522,95 @@ function TtsApp() {
     return () => { active = false; };
   }, [provider, gender]);
 
-  const changeText = (event: ChangeEvent<HTMLTextAreaElement>) => {
-    setText(event.target.value);
+  const updatePart = (groupId: string, partId: string, update: (part: ScriptPart) => ScriptPart) => {
+    setScriptGroups((current) => current.map((group) => group.id !== groupId ? group : {
+      ...group,
+      parts: group.parts.map((part) => part.id === partId ? update(part) : part),
+    }));
+  };
+
+  const updatePartText = (groupId: string, partId: string, value: string) => {
+    const oldPart = scriptGroups.find((group) => group.id === groupId)?.parts.find((part) => part.id === partId);
+    if (oldPart) clearPartAudio(oldPart);
+    setScriptGroups((current) => current.map((group) => {
+      if (group.id !== groupId) return group;
+      const parts = group.parts.map((part) => part.id === partId
+        ? { ...part, text: value, audioUrl: null, downloadUrl: null, error: "" }
+        : part);
+      return { ...group, sourceText: parts.map((part) => part.text).join("\n\n"), parts };
+    }));
     setError("");
+  };
+
+  const addManualGroup = () => {
+    setScriptGroups((current) => [...current, createScriptGroup("", "manual", "", provider)]);
+  };
+
+  const insertTestSentence = (number: number, sampleText: string) => {
     clearAudio();
+    const group = createScriptGroup(`테스트 문장 ${number}.txt`, "sample", sampleText, provider);
+    setScriptGroups((current) => {
+      const replaceIndex = current.findIndex((item) => item.kind === "sample") >= 0
+        ? current.findIndex((item) => item.kind === "sample")
+        : current.findIndex((item) => item.kind === "manual" && !item.sourceText.trim() && item.parts.every((part) => !part.text.trim()));
+      if (replaceIndex < 0) return [...current, group];
+      return current.map((item, index) => index === replaceIndex ? group : item);
+    });
+    setError("");
+  };
+
+  const handleTextFiles = async (files: File[]) => {
+    if (loading || isReadingFiles || files.length === 0) return;
+    const textFiles = files.filter((file) => file.name.toLowerCase().endsWith(".txt"));
+    let rejectedCount = files.length - textFiles.length;
+    if (textFiles.length === 0) {
+      setError("텍스트 파일(.txt)을 선택해 주세요.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setIsReadingFiles(true);
+    setError("");
+    const imported: ScriptGroup[] = [];
+    for (let index = 0; index < textFiles.length; index += 1) {
+      const file = textFiles[index];
+      setGenerationNote(`텍스트 파일을 읽고 있어요 (${index + 1}/${textFiles.length})`);
+      try {
+        const sourceText = await readTextFile(file);
+        imported.push(createScriptGroup(file.name, "file", sourceText, provider));
+      } catch {
+        rejectedCount += 1;
+      }
+    }
+
+    if (imported.length > 0) {
+      clearAudio();
+      setScriptGroups((current) => {
+        const keep = current.filter((group) => !(group.kind === "manual" && !group.sourceText.trim() && group.parts.every((part) => !part.text.trim())));
+        return [...keep, ...imported];
+      });
+    }
+    if (rejectedCount > 0) setError("일부 파일을 읽지 못했어요. .txt 파일인지 확인해 주세요.");
+    setGenerationNote("");
+    setIsReadingFiles(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeScriptGroup = (groupId: string) => {
+    const removed = scriptGroups.find((group) => group.id === groupId);
+    removed?.parts.forEach(clearPartAudio);
+    setScriptGroups((current) => {
+      const remaining = current.filter((group) => group.id !== groupId);
+      return remaining.length > 0 ? remaining : [createScriptGroup("", "manual", "", provider)];
+    });
+  };
+
+  const repartitionGroups = (nextProvider: ProviderId) => {
+    clearAudio();
+    setScriptGroups((current) => current.map((group) => ({
+      ...group,
+      parts: splitTextIntoChunks(group.sourceText, nextProvider).map(createScriptPart),
+    })));
   };
 
   const chooseProvider = (nextProvider: ProviderId) => {
@@ -416,7 +619,7 @@ function TtsApp() {
     setVoiceName(getStaticVoices(nextProvider, DEFAULT_MODELS[nextProvider], gender)[0]?.id ?? "");
     setElevenVoices([]);
     setError("");
-    clearAudio();
+    repartitionGroups(nextProvider);
   };
 
   const chooseModel = (nextModel: string) => {
@@ -435,69 +638,90 @@ function TtsApp() {
     clearAudio();
   };
 
-  const generateAudio = async () => {
-    if (!text.trim() || loading || voiceLoading || !voiceName) return;
+  const generateParts = async (requestedJobs: { groupId: string; partId: string }[]) => {
+    if (loading || voiceLoading || !voiceName) return;
+    const jobs = requestedJobs.flatMap(({ groupId, partId }) => {
+      const group = scriptGroups.find((item) => item.id === groupId);
+      const partIndex = group?.parts.findIndex((item) => item.id === partId) ?? -1;
+      const part = group?.parts[partIndex];
+      if (!group || !part || !part.text.trim() || textExceedsLimit(part.text, provider)) return [];
+      return [{ groupId, partId, sourceName: group.sourceName, partIndex: partIndex + 1, partCount: group.parts.length, text: part.text.trim() }];
+    });
+    if (jobs.length === 0) return;
+
     setLoading(true);
     setError("");
-    clearAudio();
     let turnstileSessionActive = hasTurnstileSession;
 
     try {
-      if (provider === "supertonic") {
-        setGenerationNote("기기에서 음성을 만들고 있어요. 첫 실행은 모델 다운로드가 필요해요.");
-        const { synthesizeSupertonicMp3 } = await import("./supertonic");
-        const audioBlob = await synthesizeSupertonicMp3(text.trim(), voiceName, speed, setGenerationNote);
-        const taggedBlob = await addId3Metadata(audioBlob, audioMetadata);
-        setDownloadUrl(URL.createObjectURL(taggedBlob));
-        setAudioUrl(URL.createObjectURL(audioBlob));
-        return;
-      }
+      for (let index = 0; index < jobs.length; index += 1) {
+        const job = jobs[index];
+        setGenerationNote(`${index + 1}/${jobs.length}개 음성을 만들고 있어요`);
+        updatePart(job.groupId, job.partId, (part) => ({ ...part, isLoading: true, error: "" }));
+        try {
+          let audioBlob: Blob;
+          if (provider === "supertonic") {
+            setGenerationNote(`${index + 1}/${jobs.length}개 · 기기에서 음성을 만들고 있어요`);
+            const { synthesizeSupertonicMp3 } = await import("./supertonic");
+            audioBlob = await synthesizeSupertonicMp3(job.text, voiceName, speed, setGenerationNote);
+          } else {
+            const response = await fetch("/api/synthesize", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                provider,
+                text: job.text,
+                model,
+                gender,
+                voiceName,
+                speakingRate: speed,
+                website: honeypot,
+                elapsedMs: Math.round(performance.now() - startedAt),
+                turnstileToken,
+              }),
+            });
+            const sessionExpiry = Number(response.headers.get("X-TTS-Session-Expires"));
+            if (Number.isFinite(sessionExpiry) && sessionExpiry > Date.now()) {
+              turnstileSessionActive = true;
+              setTurnstileSessionExpiresAt(sessionExpiry);
+              storeTurnstileSessionExpiry(sessionExpiry);
+            } else if (response.status === 403) {
+              turnstileSessionActive = false;
+              setTurnstileSessionExpiresAt(0);
+              clearTurnstileSessionExpiry();
+            }
+            if (!response.ok) {
+              const result = (await response.json()) as { error?: string };
+              const requestError = new Error(result.error || "음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.") as Error & { status?: number };
+              requestError.status = response.status;
+              throw requestError;
+            }
+            audioBlob = await response.blob();
+            if (response.headers.get("content-type")?.includes("audio/wav")) {
+              const { wavToMp3 } = await import("./audio");
+              audioBlob = await wavToMp3(await audioBlob.arrayBuffer());
+            }
+          }
 
-      const response = await fetch("/api/synthesize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider,
-          text: text.trim(),
-          model,
-          gender,
-          voiceName,
-          speakingRate: speed,
-          website: honeypot,
-          elapsedMs: Math.round(performance.now() - startedAt),
-          turnstileToken,
-        }),
-      });
-      const sessionExpiry = Number(response.headers.get("X-TTS-Session-Expires"));
-      if (Number.isFinite(sessionExpiry) && sessionExpiry > Date.now()) {
-        turnstileSessionActive = true;
-        setTurnstileSessionExpiresAt(sessionExpiry);
-        storeTurnstileSessionExpiry(sessionExpiry);
-      } else if (response.status === 403) {
-        turnstileSessionActive = false;
-        setTurnstileSessionExpiresAt(0);
-        clearTurnstileSessionExpiry();
+          if (!audioBlob.size) throw new Error("음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
+          const metadata = {
+            text: job.text,
+            service: providerInfoLabel(provider),
+            model: modelInfo.label,
+            gender: genderSupported ? (gender === "FEMALE" ? "여성" : "남성") : "모델 기본",
+            voice: selectedVoiceLabel,
+          };
+          const taggedBlob = await addId3Metadata(audioBlob, metadata);
+          const downloadUrl = createTrackedUrl(taggedBlob);
+          const audioUrl = createTrackedUrl(audioBlob);
+          updatePart(job.groupId, job.partId, (part) => ({ ...part, audioUrl, downloadUrl, isLoading: false, error: "" }));
+        } catch (caught) {
+          const message = caught instanceof Error ? caught.message : "음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.";
+          updatePart(job.groupId, job.partId, (part) => ({ ...part, isLoading: false, error: message }));
+          const status = (caught as Error & { status?: number })?.status;
+          if (status === 403 || status === 429) break;
+        }
       }
-      if (!response.ok) {
-        const result = (await response.json()) as { error?: string };
-        throw new Error(result.error || "음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
-      }
-
-      let audioBlob = await response.blob();
-      if (!audioBlob.size) throw new Error("음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
-      if (response.headers.get("content-type")?.includes("audio/wav")) {
-        const { wavToMp3 } = await import("./audio");
-        audioBlob = await wavToMp3(await audioBlob.arrayBuffer());
-      }
-      const taggedBlob = await addId3Metadata(audioBlob, audioMetadata);
-      setDownloadUrl(URL.createObjectURL(taggedBlob));
-      setAudioUrl(URL.createObjectURL(audioBlob));
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.",
-      );
     } finally {
       if (provider !== "supertonic" && TURNSTILE_SITE_KEY && turnstileWidgetIdRef.current && window.turnstile && !turnstileSessionActive) {
         window.turnstile.reset(turnstileWidgetIdRef.current);
@@ -507,6 +731,12 @@ function TtsApp() {
       setLoading(false);
     }
   };
+
+  const allJobs = scriptGroups.flatMap((group) => group.parts.map((part) => ({ groupId: group.id, partId: part.id, text: part.text })));
+  const pendingJobs = allJobs.filter((job) => job.text.trim() && !scriptGroups
+    .find((group) => group.id === job.groupId)?.parts.find((part) => part.id === job.partId)?.audioUrl);
+  const hasOverLimitPart = scriptGroups.some((group) => group.parts.some((part) => textExceedsLimit(part.text, provider)));
+  const completedAudioCount = scriptGroups.reduce((count, group) => count + group.parts.filter((part) => Boolean(part.audioUrl)).length, 0);
 
   return (
     <main className="page-shell">
@@ -561,6 +791,7 @@ function TtsApp() {
             <select
               id="provider"
               value={provider}
+              disabled={loading || isReadingFiles}
               onChange={(event) => chooseProvider(event.target.value as ProviderId)}
             >
               {PROVIDERS.map((option) => <option value={option.id} key={option.id}>{option.label}</option>)}
@@ -582,6 +813,7 @@ function TtsApp() {
                 type="button"
                 role="tab"
                 aria-selected={model === option.id}
+                disabled={loading || isReadingFiles}
                 onClick={() => chooseModel(option.id)}
               >
                 <span className="model-option-name">{option.label}</span>
@@ -608,14 +840,14 @@ function TtsApp() {
                 type="button"
                 className={gender === "FEMALE" ? "active" : ""}
                 aria-pressed={gender === "FEMALE"}
-                disabled={!genderSupported}
+                disabled={!genderSupported || loading || isReadingFiles}
                 onClick={() => chooseGender("FEMALE")}
               >여성</button>
               <button
                 type="button"
                 className={gender === "MALE" ? "active" : ""}
                 aria-pressed={gender === "MALE"}
-                disabled={!genderSupported}
+                disabled={!genderSupported || loading || isReadingFiles}
                 onClick={() => chooseGender("MALE")}
               >남성</button>
             </div>
@@ -633,7 +865,7 @@ function TtsApp() {
                   setVoiceName(event.target.value);
                   clearAudio();
                 }}
-                disabled={voiceLoading || voices.length === 0}
+                disabled={voiceLoading || voices.length === 0 || loading || isReadingFiles}
               >
                 {voiceLoading && <option value="">음성을 불러오는 중…</option>}
                 {!voiceLoading && voices.length === 0 && <option value="">사용 가능한 음성이 없어요</option>}
@@ -659,7 +891,7 @@ function TtsApp() {
             max={speedMax}
             step={speedStep}
             value={speed}
-            disabled={!speedSupported}
+            disabled={!speedSupported || loading || isReadingFiles}
             onChange={(event) => {
               setSpeed(Number(event.target.value));
               clearAudio();
@@ -682,45 +914,146 @@ function TtsApp() {
                     type="button"
                     key={sentence}
                     aria-label={`테스트 문장 ${index + 1} 입력`}
-                    onClick={() => {
-                      setText(sentence);
-                      setError("");
-                      clearAudio();
-                    }}
+                    disabled={loading || isReadingFiles}
+                    onClick={() => insertTestSentence(index + 1, sentence)}
                   >테스트 {index + 1}</button>
                 ))}
+                <button type="button" aria-label="긴 문장 분할 테스트 입력" onClick={() => insertTestSentence(4, SPLIT_TEST_TEXT)} disabled={loading || isReadingFiles}>테스트 4</button>
               </div>
             </div>
           </div>
-          <span className={`char-count ${exceedsTextLimit ? "over-limit" : ""}`}>
-            {characterCount.toLocaleString()} <span>/ {characterLimit.toLocaleString()}자</span>
-            {hasGoogleCloudByteLimit && <small className={textByteCount > GOOGLE_CLOUD_MAX_TEXT_BYTES ? "byte-count over-limit" : "byte-count"}>{textByteCount.toLocaleString()} / 5,000바이트</small>}
-          </span>
+          <span className="char-count">입력칸 {scriptGroups.reduce((count, group) => count + group.parts.length, 0)}개</span>
         </div>
 
-        <textarea
-          className="script-input"
-          aria-label="음성으로 바꿀 문장"
-          placeholder={`여기에 문장을 입력해 주세요.
+        <div
+          className={`file-drop-zone ${isDraggingFiles ? "drag-active" : ""}`}
+          onDragEnter={(event) => { event.preventDefault(); setIsDraggingFiles(true); }}
+          onDragOver={(event) => { event.preventDefault(); setIsDraggingFiles(true); }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsDraggingFiles(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDraggingFiles(false);
+            void handleTextFiles(Array.from(event.dataTransfer.files));
+          }}
+        >
+          <div>
+            <strong>.txt 파일을 여기에 끌어다 놓으세요</strong>
+            <span>여러 파일을 한꺼번에 선택할 수 있어요. 긴 파일은 자동으로 나눠요.</span>
+          </div>
+          <div className="file-picker-actions">
+            <input
+              ref={fileInputRef}
+              className="file-input-hidden"
+              type="file"
+              accept=".txt,text/plain"
+              multiple
+              disabled={loading || isReadingFiles}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => void handleTextFiles(Array.from(event.target.files ?? []))}
+              aria-label="여러 텍스트 파일 선택"
+            />
+            <button type="button" className="secondary-button" onClick={() => fileInputRef.current?.click()} disabled={loading || isReadingFiles}>
+              {isReadingFiles ? "파일을 읽고 있어요" : ".txt 파일 선택"}
+            </button>
+            <button type="button" className="secondary-button" onClick={addManualGroup} disabled={loading || isReadingFiles}>문장 직접 추가</button>
+          </div>
+        </div>
 
-예) 오늘은 기분 좋은 바람이 불어요. 천천히 주변을 둘러보며 걸어 볼까요?`}
-          value={text}
-          onChange={changeText}
-          maxLength={characterLimit}
-          rows={6}
-        />
-        <div className="input-footer">
-          <span><Icon name="spark" /> 한국어 문장을 자연스럽게 읽어 드려요</span>
-          <button
-            type="button"
-            className="clear-button"
-            onClick={() => {
-              setText("");
-              setError("");
-              clearAudio();
-            }}
-            disabled={!text}
-          >지우기</button>
+        <div className="script-groups">
+          {scriptGroups.map((group, groupIndex) => (
+            <section className="script-group" key={group.id} aria-label={group.sourceName || `직접 입력 ${groupIndex + 1}`}>
+              <div className="script-group-heading">
+                <div>
+                  <strong>{group.sourceName || "직접 입력"}</strong>
+                  <span>{group.parts.length > 1 ? `${group.parts.length}개 문장으로 나눴어요` : "MP3 파일 1개"}</span>
+                </div>
+                {(group.kind !== "manual" || scriptGroups.length > 1) && (
+                  <button type="button" className="clear-button" onClick={() => removeScriptGroup(group.id)} disabled={loading || isReadingFiles}>삭제</button>
+                )}
+              </div>
+              {group.parts.map((part, partIndex) => {
+                const characterCount = Array.from(part.text).length;
+                const textByteCount = UTF8_ENCODER.encode(part.text.trim()).length;
+                const overLimit = textExceedsLimit(part.text, provider);
+                const metadata = {
+                  text: part.text.trim(),
+                  service: providerInfoLabel(provider),
+                  model: modelInfo.label,
+                  gender: genderSupported ? (gender === "FEMALE" ? "여성" : "남성") : "모델 기본",
+                  voice: selectedVoiceLabel,
+                };
+                const filename = createMp3Filename(metadata, group.sourceName, partIndex + 1, group.parts.length);
+                const singlePartJob = [{ groupId: group.id, partId: part.id }];
+
+                return (
+                  <article className="script-part" key={part.id}>
+                    <div className="script-part-heading">
+                      <strong>{group.parts.length > 1 ? `문장 ${partIndex + 1}` : "읽을 문장"}</strong>
+                      <span className={overLimit ? "part-count over-limit" : "part-count"}>
+                        {characterCount.toLocaleString()} / {characterLimit.toLocaleString()}자
+                        {hasGoogleCloudByteLimit && ` · ${textByteCount.toLocaleString()} / 5,000바이트`}
+                      </span>
+                    </div>
+                    <textarea
+                      className="script-input"
+                      aria-label={`${group.sourceName || "직접 입력"} ${group.parts.length > 1 ? `문장 ${partIndex + 1}` : "읽을 문장"}`}
+                      placeholder="여기에 문장을 입력해 주세요."
+                      value={part.text}
+                      onChange={(event) => updatePartText(group.id, part.id, event.target.value)}
+                      maxLength={characterLimit}
+                      rows={6}
+                      disabled={loading || isReadingFiles}
+                    />
+                    <div className="input-footer">
+                      <span><Icon name="spark" /> 한국어 문장을 자연스럽게 읽어 드려요</span>
+                      <div className="part-actions">
+                        {overLimit && (
+                          <button
+                            type="button"
+                            className="clear-button"
+                            onClick={() => {
+                              const chunks = splitTextIntoChunks(part.text, provider);
+                              if (chunks.length < 2) return;
+                              clearPartAudio(part);
+                              setScriptGroups((current) => current.map((item) => {
+                                if (item.id !== group.id) return item;
+                                const parts = item.parts.flatMap((existing) => existing.id === part.id ? chunks.map(createScriptPart) : [existing]);
+                                return { ...item, sourceText: parts.map((existing) => existing.text).join("\n\n"), parts };
+                              }));
+                            }}
+                            disabled={loading}
+                          >나누기</button>
+                        )}
+                        <button type="button" className="clear-button" onClick={() => updatePartText(group.id, part.id, "")} disabled={loading || !part.text}>지우기</button>
+                      </div>
+                    </div>
+                    {part.error && <div className="part-error" role="alert">{part.error}</div>}
+                    {part.audioUrl && (
+                      <div className="audio-result" aria-live="polite">
+                        <div className="result-title">
+                          <span className="result-icon"><Icon name="play" /></span>
+                          <div><strong>음성이 준비됐어요</strong><span>MP3 (엠피쓰리) · {metadata.service} · {metadata.model} · {metadata.gender} · {metadata.voice} · {speedSupported ? `${speed.toFixed(2)}×` : "기본 속도"}</span></div>
+                        </div>
+                        <audio controls src={part.audioUrl} aria-label={`${group.sourceName || "읽을 문장"} 미리 듣기 ${partIndex + 1}`} />
+                        <a className="download-button" href={part.downloadUrl ?? undefined} download={filename}>
+                          <Icon name="download" /> MP3 (엠피쓰리) 내려받기
+                        </a>
+                      </div>
+                    )}
+                    {!part.audioUrl && (
+                      <button
+                        className="part-generate-button"
+                        type="button"
+                        onClick={() => void generateParts(singlePartJob)}
+                        disabled={loading || isReadingFiles || voiceLoading || !part.text.trim() || overLimit || !voiceName || (provider !== "supertonic" && !!TURNSTILE_SITE_KEY && !turnstileToken && !hasTurnstileSession)}
+                      >{part.isLoading ? <><span className="spinner" /> 만들고 있어요</> : "이 문장 생성하기"}</button>
+                    )}
+                  </article>
+                );
+              })}
+            </section>
+          ))}
         </div>
 
         <div className="honeypot" aria-hidden="true">
@@ -748,32 +1081,17 @@ function TtsApp() {
           <button
             className="generate-button"
             type="button"
-            onClick={generateAudio}
-            disabled={loading || voiceLoading || !voiceName || !text.trim() || exceedsTextLimit || (provider !== "supertonic" && !!TURNSTILE_SITE_KEY && !turnstileToken && !hasTurnstileSession)}
+            onClick={() => void generateParts(pendingJobs.map(({ groupId, partId }) => ({ groupId, partId })))}
+            disabled={loading || isReadingFiles || voiceLoading || !voiceName || pendingJobs.length === 0 || hasOverLimitPart || (provider !== "supertonic" && !!TURNSTILE_SITE_KEY && !turnstileToken && !hasTurnstileSession)}
           >
             {loading ? (
               <><span className="spinner" /> 음성을 만들고 있어요</>
             ) : (
-              <><Icon name="play" /> 생성하기</>
+              <><Icon name="play" /> {pendingJobs.length > 1 ? "전체 생성하기" : pendingJobs.length === 0 && completedAudioCount > 0 ? "모두 만들었어요" : "생성하기"}</>
             )}
           </button>
-          <span className="action-caption">{generationNote || "생성 후 미리 듣고 MP3 (엠피쓰리) 파일로 저장할 수 있어요"}</span>
+          <span className="action-caption">{generationNote || (hasOverLimitPart ? "글자 수 제한을 넘은 문장을 나눠 주세요" : pendingJobs.length > 0 ? `${pendingJobs.length}개 음성을 만들 수 있어요. 생성 후 각각 미리 듣고 MP3로 저장합니다.` : completedAudioCount > 0 ? "모두 만들었어요. 아래에서 각각 미리 듣거나 저장하세요." : "문장을 입력하거나 .txt 파일을 선택해 주세요.")}</span>
         </div>
-
-        {audioUrl && (
-          <div className="audio-result" aria-live="polite">
-            <div className="result-title">
-              <span className="result-icon"><Icon name="play" /></span>
-              <div><strong>음성이 준비됐어요</strong><span>MP3 (엠피쓰리) · {audioMetadata.service} · {audioMetadata.model} · {audioMetadata.gender} · {audioMetadata.voice} · {speedSupported ? `${speed.toFixed(2)}×` : "기본 속도"}</span></div>
-            </div>
-            <audio controls src={audioUrl} aria-label="생성된 음성 미리 듣기" />
-            <a
-              className="download-button"
-              href={downloadUrl ?? undefined}
-              download={downloadFilename}
-            ><Icon name="download" /> MP3 (엠피쓰리) 내려받기</a>
-          </div>
-        )}
       </section>
 
       <footer className="page-footer">

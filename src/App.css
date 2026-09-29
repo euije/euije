@@ -449,7 +449,83 @@
   white-space: nowrap;
 }
 .sample-buttons button:hover { border-color: #8fb497; background: #eef6ef; }
+.sample-buttons button:disabled { opacity: 0.55; cursor: not-allowed; }
 .sample-buttons button:focus-visible { outline: 3px solid rgb(106 156 123 / 25%); outline-offset: 2px; }
+
+.file-drop-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  border: 1px dashed #b9cebd;
+  border-radius: 11px;
+  background: #f9fcf9;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.file-drop-zone.drag-active { border-color: #3e7962; background: #eef7ef; }
+.file-drop-zone > div:first-child { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.file-drop-zone strong { color: #42564a; font-size: 14px; }
+.file-drop-zone span { color: #8b9690; font-size: 12px; line-height: 1.5; }
+.file-picker-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 7px; }
+.file-input-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.secondary-button {
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid #d5e2d7;
+  border-radius: 8px;
+  background: white;
+  color: #4b6f57;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+}
+.secondary-button:hover:not(:disabled) { border-color: #89ad90; background: #f3f8f3; }
+.secondary-button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.script-groups { display: flex; flex-direction: column; gap: 13px; }
+.script-group { overflow: hidden; border: 1px solid #e5ebe6; border-radius: 12px; background: #fff; }
+.script-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  background: #f8faf8;
+}
+.script-group-heading > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.script-group-heading strong { overflow: hidden; color: #46574b; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.script-group-heading span { color: #929d95; font-size: 11px; }
+.script-part { padding: 14px; border-top: 1px solid #edf0ed; }
+.script-part-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.script-part-heading strong { color: #3c4a40; font-size: 13px; }
+.part-count { color: #8b9690; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+.part-count.over-limit { color: #bc5143; }
+.part-actions { display: flex; align-items: center; gap: 10px; }
+.part-generate-button {
+  display: inline-flex;
+  min-height: 37px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 11px;
+  padding: 0 13px;
+  border: 1px solid #cbdccc;
+  border-radius: 8px;
+  background: white;
+  color: #42684d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+.part-generate-button:hover:not(:disabled) { border-color: #76a17b; background: #f4f9f2; }
+.part-generate-button:disabled { opacity: 0.6; cursor: not-allowed; }
+.part-generate-button .spinner { border-color: rgb(63 123 97 / 25%); border-top-color: #3f7b61; }
+.part-error { margin-top: 10px; padding: 9px 11px; border-radius: 8px; background: #fff7f5; color: #a84e43; font-size: 12px; line-height: 1.5; }
+.script-part .audio-result { margin-top: 12px; }
 
 .char-count {
   display: flex;
@@ -649,6 +725,13 @@
   .script-title-row { gap: 6px; }
   .sample-buttons { gap: 4px; }
   .sample-buttons button { min-height: 28px; padding: 3px 6px; font-size: 10px; }
+  .file-drop-zone { align-items: stretch; flex-direction: column; gap: 11px; padding: 14px; }
+  .file-picker-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .file-picker-actions .secondary-button { min-width: 0; padding: 0 7px; }
+  .script-group-heading { padding: 10px 12px; }
+  .script-part { padding: 11px; }
+  .script-part-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .part-count { text-align: left; }
   .field-hint { font-size: 11px; }
   .studio-card > .field-block { margin-top: 22px; }
   .model-list { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 7px; }

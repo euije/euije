@@ -137,11 +137,15 @@ function cleanFilenamePart(value: string, maxCharacters: number, maxBytes: numbe
   return result;
 }
 
-export function createMp3Filename(metadata: Mp3Metadata) {
-  const sentence = cleanFilenamePart(metadata.text.replace(/\s+/g, " "), 20, 30) || "음성";
-  const service = cleanFilenamePart(metadata.service, 20, 26) || "TTS";
-  const model = cleanFilenamePart(metadata.model, 36, 64) || "모델";
-  const gender = cleanFilenamePart(metadata.gender, 8, 12) || "성별";
-  const voice = cleanFilenamePart(metadata.voice, 20, 34) || "음성";
-  return `텍스트-스피치_문장-${sentence}_서비스-${service}_모델-${model}_성별-${gender}_음성-${voice}.mp3`;
+export function createMp3Filename(metadata: Mp3Metadata, sourceName = "", partIndex = 1, partCount = 1) {
+  const baseName = sourceName
+    ? sourceName.replace(/\.txt$/i, "")
+    : metadata.text.replace(/\s+/g, " ");
+  const title = cleanFilenamePart(baseName, 36, 70) || "음성";
+  const part = partCount > 1 ? `_분할${partIndex}중${partCount}` : "";
+  const service = cleanFilenamePart(metadata.service, 12, 22) || "TTS";
+  const model = cleanFilenamePart(metadata.model, 26, 48) || "모델";
+  const gender = cleanFilenamePart(metadata.gender, 4, 8) || "성별";
+  const voice = cleanFilenamePart(metadata.voice, 12, 20) || "음성";
+  return `${title}${part}_서비스-${service}_모델-${model}_성별-${gender}_음성-${voice}.mp3`;
 }

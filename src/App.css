@@ -2,6 +2,29 @@
   min-height: 100vh;
 }
 
+.route-not-found {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  color: var(--ink);
+  text-align: center;
+}
+
+.route-not-found h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.04em;
+}
+
+.route-not-found a {
+  color: #315e4b;
+  font-size: 14px;
+}
+
 .page-shell {
   width: min(100% - 40px, 900px);
   margin: 0 auto;

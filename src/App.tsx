@@ -169,6 +169,19 @@ function Icon({ name }: { name: "spark" | "download" | "play" | "arrow" }) {
 }
 
 function App() {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (path !== "/tts") {
+    return (
+      <main className="route-not-found">
+        <h1>페이지를 찾을 수 없습니다.</h1>
+        <a href="/tts">텍스트-스피치 열기</a>
+      </main>
+    );
+  }
+  return <TtsApp />;
+}
+
+function TtsApp() {
   const [text, setText] = useState("");
   const [provider, setProvider] = useState<ProviderId>("google");
   const [model, setModel] = useState(DEFAULT_MODELS.google);
@@ -361,7 +374,7 @@ function App() {
   return (
     <main className="page-shell">
       <header className="topbar">
-        <a className="brand" href="/tts" aria-label="소리결 홈">
+        <a className="brand" href="/tts" aria-label="텍스트-스피치 홈">
           <span className="brand-mark" aria-hidden="true">
             <i />
             <i />
@@ -369,7 +382,7 @@ function App() {
             <i />
             <i />
           </span>
-          <span>소리결</span>
+          <span>텍스트-스피치</span>
         </a>
         <span className="topbar-note">한국어 텍스트 음성 변환</span>
       </header>
@@ -602,14 +615,14 @@ function App() {
             <a
               className="download-button"
               href={audioUrl}
-              download="sorigyeol-voice.mp3"
+              download="text-to-speech.mp3"
             ><Icon name="download" /> MP3 다운로드</a>
           </div>
         )}
       </section>
 
       <footer className="page-footer">
-        <span>소리결 <span className="footer-separator">·</span> 글을 듣는 또 다른 방법</span>
+        <span>텍스트-스피치 <span className="footer-separator">·</span> 글을 듣는 또 다른 방법</span>
         <span className="footer-right"><span>{providerInfoLabel(provider)}</span><a href="/third-party-notices.html">오픈소스 라이선스</a></span>
       </footer>
     </main>

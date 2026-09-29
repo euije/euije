@@ -1,6 +1,7 @@
 // Adapted from Supertone's Supertonic Web TTS helper (MIT).
 // Original: https://raw.githubusercontent.com/supertone-oss-archive/supertonic/main/web/helper.js
 // License copy: third_party/Supertonic/LICENSE
+/* global BigInt, BigInt64Array */
 
 import * as ort from 'onnxruntime-web/webgpu';
 
@@ -107,7 +108,7 @@ export class UnicodeProcessor {
         text = text.replace(/\s+/g, ' ').trim();
 
         // If text doesn't end with punctuation, quotes, or closing brackets, add a period
-        if (!/[.!?;:,'\"')\]}…。」』】〉》›»]$/.test(text)) {
+        if (!/[.!?;:,'"')\]}…。」』】〉》›»]$/.test(text)) {
             text += '.';
         }
 
@@ -439,6 +440,9 @@ export async function loadOnnx(onnxPath, options) {
 
 /**
  * Load all TTS components
+ * @param {string} onnxDir
+ * @param {object} [sessionOptions]
+ * @param {((name: string, index: number, total: number) => void) | null} [progressCallback]
  */
 export async function loadTextToSpeech(onnxDir, sessionOptions = {}, progressCallback = null) {
     console.log('Using WebAssembly/WebGPU for inference');

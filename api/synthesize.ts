@@ -288,7 +288,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     if (provider === "azure") {
-      const apiKey = process.env.AZURE_SPEECH_KEY;
+      const apiKey = process.env.AZURE_SPEECH_KEY || process.env.AZURE_SPEECH_KEY2;
       if (!apiKey) return fail(res, 503, "Azure Speech 키를 서버 환경 변수에 설정해 주세요.");
       const region = (process.env.AZURE_SPEECH_REGION || "koreacentral").toLowerCase();
       if (!/^[a-z0-9-]+$/.test(region)) return fail(res, 500, "Azure Speech 지역 설정을 확인해 주세요.");

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "proxy": "http://127.0.0.1:3001",
   "dependencies": {
     "@types/node": "^16.7.13",
     "@types/react": "^18.0.0",
@@ -16,7 +17,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build"
+    "build": "react-scripts build",
+    "dev:api": "node --experimental-strip-types --env-file=.env scripts/dev-api.mjs"
   },
   "eslintConfig": {
     "extends": ["react-app"]

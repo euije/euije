@@ -157,6 +157,7 @@ const DEFAULT_MODELS: Record<ProviderId, string> = {
 };
 
 const MAX_CHARACTERS = 5000;
+const MAI_VOICE_2_FLASH_MAX_CHARACTERS = 250;
 const GOOGLE_CLOUD_MAX_TEXT_BYTES = 5000;
 const UTF8_ENCODER = new TextEncoder();
 const SAMPLE_SENTENCES = [
@@ -178,10 +179,17 @@ function createScriptPart(text: string): ScriptPart {
   return { id: createId("part"), text, audioUrl: null, downloadUrl: null, isLoading: false, error: "" };
 }
 
-function splitTextIntoChunks(text: string, provider: ProviderId) {
+function getMaxCharacters(provider: ProviderId, model: string) {
+  return provider === "openrouter" && model === "microsoft/mai-voice-2-flash"
+    ? MAI_VOICE_2_FLASH_MAX_CHARACTERS
+    : MAX_CHARACTERS;
+}
+
+function splitTextIntoChunks(text: string, provider: ProviderId, model: string) {
   const characters = Array.from(text.replace(/\r\n?/g, "\n").trim());
   if (!characters.length) return [""];
 
+  const maxCharacters = getMaxCharacters(provider, model);
   const maxBytes = provider === "google" ? GOOGLE_CLOUD_MAX_TEXT_BYTES : Number.POSITIVE_INFINITY;
   const byteLengths = characters.map((character) => UTF8_ENCODER.encode(character).length);
   const chunks: string[] = [];
@@ -190,7 +198,7 @@ function splitTextIntoChunks(text: string, provider: ProviderId) {
   while (start < characters.length) {
     let end = start;
     let bytes = 0;
-    while (end < characters.length && end - start < MAX_CHARACTERS && bytes + byteLengths[end] <= maxBytes) {
+    while (end < characters.length && end - start < maxCharacters && bytes + byteLengths[end] <= maxBytes) {
       bytes += byteLengths[end];
       end += 1;
     }
@@ -224,19 +232,19 @@ function splitTextIntoChunks(text: string, provider: ProviderId) {
   return chunks.length ? chunks : [""];
 }
 
-function createScriptGroup(sourceName: string, kind: ScriptGroup["kind"], sourceText: string, provider: ProviderId): ScriptGroup {
+function createScriptGroup(sourceName: string, kind: ScriptGroup["kind"], sourceText: string, provider: ProviderId, model: string): ScriptGroup {
   return {
     id: createId(kind),
     sourceName,
     kind,
     sourceText,
-    parts: splitTextIntoChunks(sourceText, provider).map(createScriptPart),
+    parts: splitTextIntoChunks(sourceText, provider, model).map(createScriptPart),
   };
 }
 
-function textExceedsLimit(text: string, provider: ProviderId) {
+function textExceedsLimit(text: string, provider: ProviderId, model: string) {
   const trimmed = text.trim();
-  return Array.from(trimmed).length > MAX_CHARACTERS || (
+  return Array.from(trimmed).length > getMaxCharacters(provider, model) || (
     provider === "google" && UTF8_ENCODER.encode(trimmed).length > GOOGLE_CLOUD_MAX_TEXT_BYTES
   );
 }
@@ -362,7 +370,7 @@ function App() {
 }
 
 function TtsApp() {
-  const [scriptGroups, setScriptGroups] = useState<ScriptGroup[]>(() => [createScriptGroup("", "manual", "", "google")]);
+  const [scriptGroups, setScriptGroups] = useState<ScriptGroup[]>(() => [createScriptGroup("", "manual", "", "google", DEFAULT_MODELS.google)]);
   const [provider, setProvider] = useState<ProviderId>("google");
   const [model, setModel] = useState(DEFAULT_MODELS.google);
   const [gender, setGender] = useState<Gender>("FEMALE");
@@ -392,7 +400,7 @@ function TtsApp() {
   const genderSupported = !(provider === "openrouter" && model === "fish-audio/s2.1-pro-free:free");
   const hasTurnstileSession = turnstileSessionExpiresAt > Date.now();
   const voices = provider === "elevenlabs" ? elevenVoices : getStaticVoices(provider, model, gender);
-  const characterLimit = MAX_CHARACTERS;
+  const characterLimit = getMaxCharacters(provider, model);
   const hasGoogleCloudByteLimit = provider === "google";
   const selectedVoiceLabel = voices.find((voice) => voice.id === voiceName)?.name ?? voiceName;
 
@@ -542,12 +550,12 @@ function TtsApp() {
   };
 
   const addManualGroup = () => {
-    setScriptGroups((current) => [...current, createScriptGroup("", "manual", "", provider)]);
+    setScriptGroups((current) => [...current, createScriptGroup("", "manual", "", provider, model)]);
   };
 
   const insertTestSentence = (number: number, sampleText: string) => {
     clearAudio();
-    const group = createScriptGroup(`테스트 문장 ${number}.txt`, "sample", sampleText, provider);
+    const group = createScriptGroup(`테스트 문장 ${number}.txt`, "sample", sampleText, provider, model);
     setScriptGroups((current) => {
       const replaceIndex = current.findIndex((item) => item.kind === "sample") >= 0
         ? current.findIndex((item) => item.kind === "sample")
@@ -576,7 +584,7 @@ function TtsApp() {
       setGenerationNote(`텍스트 파일을 읽고 있어요 (${index + 1}/${textFiles.length})`);
       try {
         const sourceText = await readTextFile(file);
-        imported.push(createScriptGroup(file.name, "file", sourceText, provider));
+        imported.push(createScriptGroup(file.name, "file", sourceText, provider, model));
       } catch {
         rejectedCount += 1;
       }
@@ -600,15 +608,15 @@ function TtsApp() {
     removed?.parts.forEach(clearPartAudio);
     setScriptGroups((current) => {
       const remaining = current.filter((group) => group.id !== groupId);
-      return remaining.length > 0 ? remaining : [createScriptGroup("", "manual", "", provider)];
+      return remaining.length > 0 ? remaining : [createScriptGroup("", "manual", "", provider, model)];
     });
   };
 
-  const repartitionGroups = (nextProvider: ProviderId) => {
+  const repartitionGroups = (nextProvider: ProviderId, nextModel: string) => {
     clearAudio();
     setScriptGroups((current) => current.map((group) => ({
       ...group,
-      parts: splitTextIntoChunks(group.sourceText, nextProvider).map(createScriptPart),
+      parts: splitTextIntoChunks(group.sourceText, nextProvider, nextModel).map(createScriptPart),
     })));
   };
 
@@ -618,7 +626,7 @@ function TtsApp() {
     setVoiceName(getStaticVoices(nextProvider, DEFAULT_MODELS[nextProvider], gender)[0]?.id ?? "");
     setElevenVoices([]);
     setError("");
-    repartitionGroups(nextProvider);
+    repartitionGroups(nextProvider, DEFAULT_MODELS[nextProvider]);
   };
 
   const chooseModel = (nextModel: string) => {
@@ -627,7 +635,7 @@ function TtsApp() {
       setVoiceName(getStaticVoices(provider, nextModel, gender)[0]?.id ?? "");
     }
     setError("");
-    clearAudio();
+    repartitionGroups(provider, nextModel);
   };
 
   const chooseGender = (nextGender: Gender) => {
@@ -643,7 +651,7 @@ function TtsApp() {
       const group = scriptGroups.find((item) => item.id === groupId);
       const partIndex = group?.parts.findIndex((item) => item.id === partId) ?? -1;
       const part = group?.parts[partIndex];
-      if (!group || !part || !part.text.trim() || textExceedsLimit(part.text, provider)) return [];
+      if (!group || !part || !part.text.trim() || textExceedsLimit(part.text, provider, model)) return [];
       return [{ groupId, partId, sourceName: group.sourceName, partIndex: partIndex + 1, partCount: group.parts.length, text: part.text.trim() }];
     });
     if (jobs.length === 0) return;
@@ -743,7 +751,7 @@ function TtsApp() {
   const allJobs = scriptGroups.flatMap((group) => group.parts.map((part) => ({ groupId: group.id, partId: part.id, text: part.text })));
   const pendingJobs = allJobs.filter((job) => job.text.trim() && !scriptGroups
     .find((group) => group.id === job.groupId)?.parts.find((part) => part.id === job.partId)?.audioUrl);
-  const hasOverLimitPart = scriptGroups.some((group) => group.parts.some((part) => textExceedsLimit(part.text, provider)));
+  const hasOverLimitPart = scriptGroups.some((group) => group.parts.some((part) => textExceedsLimit(part.text, provider, model)));
   const completedAudioCount = scriptGroups.reduce((count, group) => count + group.parts.filter((part) => Boolean(part.audioUrl)).length, 0);
 
   return (
@@ -832,7 +840,7 @@ function TtsApp() {
           <p className="price-note">{modelInfo.price}{provider === "google" && <span> · Google Cloud TTS (구글 클라우드 음성 변환) 요금</span>}</p>
           {hasGoogleCloudByteLimit && <p className="provider-note">Google Cloud TTS API (구글 클라우드 음성 변환 API)는 요청당 최대 5,000바이트까지 받아요.</p>}
           {provider === "openrouter" && model === "fish-audio/s2.1-pro-free:free" && <p className="provider-note">Fish Audio (피시 오디오) 무료 모델이며 기본 음성을 사용합니다. 무료 제공과 처리량은 OpenRouter (오픈라우터)와 Fish Audio (피시 오디오)의 정책에 따라 달라질 수 있어요.</p>}
-          {provider === "openrouter" && model === "microsoft/mai-voice-2-flash" && <p className="provider-note">OpenRouter (오픈라우터)를 통해 한국어 Haena (해나, 여성)·Junho (준호, 남성) 음성을 사용합니다.</p>}
+          {provider === "openrouter" && model === "microsoft/mai-voice-2-flash" && <p className="provider-note">OpenRouter (오픈라우터)에서 한국어 Haena (해나, 여성)·Junho (준호, 남성) 음성을 사용합니다. 한 번에 250자까지 처리하며, 긴 글은 자동으로 나눠요.</p>}
           {provider === "supertonic" && <p className="provider-note">모델을 기기에 저장해 다음 실행부터 재사용합니다. 처음 받을 때 약 400MB (400메가바이트)가 필요해요. <a href="https://huggingface.co/Supertone/supertonic-3" target="_blank" rel="noreferrer">Hugging Face (허깅페이스)의 모델 이용 조건</a>을 확인해 주세요.</p>}
           {provider !== "supertonic" && <p className="provider-note">입력 문장은 선택한 TTS 서비스로 전송돼요.</p>}
         </div>
@@ -983,7 +991,7 @@ function TtsApp() {
               {group.parts.map((part, partIndex) => {
                 const characterCount = Array.from(part.text).length;
                 const textByteCount = UTF8_ENCODER.encode(part.text.trim()).length;
-                const overLimit = textExceedsLimit(part.text, provider);
+                const overLimit = textExceedsLimit(part.text, provider, model);
                 const metadata = {
                   text: part.text.trim(),
                   service: providerInfoLabel(provider),
@@ -1021,7 +1029,7 @@ function TtsApp() {
                             type="button"
                             className="clear-button"
                             onClick={() => {
-                              const chunks = splitTextIntoChunks(part.text, provider);
+                              const chunks = splitTextIntoChunks(part.text, provider, model);
                               if (chunks.length < 2) return;
                               clearPartAudio(part);
                               setScriptGroups((current) => current.map((item) => {

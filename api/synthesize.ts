@@ -84,6 +84,7 @@ const MAX_REQUESTS_PER_WINDOW = 200;
 const TURNSTILE_SESSION_COOKIE = "tts_challenge_session";
 const TURNSTILE_SESSION_TTL_MS = 30 * 60 * 1000;
 const MAX_CHARACTERS = 5000;
+const MAI_VOICE_2_FLASH_MAX_CHARACTERS = 250;
 const GOOGLE_CLOUD_MAX_TEXT_BYTES = 5000;
 
 function getSpeedRange(provider: ProviderId, model: string): { min: number; max: number } | null {
@@ -295,12 +296,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   const text = typeof body.text === "string" ? body.text.trim() : "";
   if (!text) return fail(res, 400, "읽을 문장을 입력해 주세요.");
-  if (Array.from(text).length > MAX_CHARACTERS) {
-    return fail(res, 400, `한 번에 ${MAX_CHARACTERS.toLocaleString()}자까지 만들 수 있어요.`);
-  }
-
   const provider = body.provider as ProviderId;
   const model = typeof body.model === "string" ? body.model : "";
+  const maxCharacters = provider === "openrouter" && model === "microsoft/mai-voice-2-flash"
+    ? MAI_VOICE_2_FLASH_MAX_CHARACTERS
+    : MAX_CHARACTERS;
+  if (Array.from(text).length > maxCharacters) {
+    return fail(res, 400, `선택한 모델은 한 번에 ${maxCharacters.toLocaleString()}자까지 받아요.`);
+  }
+
   if (
     provider === "google" &&
     Buffer.byteLength(text, "utf8") > GOOGLE_CLOUD_MAX_TEXT_BYTES

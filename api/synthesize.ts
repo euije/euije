@@ -241,6 +241,34 @@ async function sendAudio(upstream: Response, res: ApiResponse) {
   return res.status(200).send(audio);
 }
 
+function wrapPcmAsWav(pcm: Buffer, sampleRate: number, channels: number) {
+  const bitsPerSample = 16;
+  const blockAlign = channels * bitsPerSample / 8;
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * blockAlign, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]);
+}
+
+function openRouterFailureMessage(status: number) {
+  if (status === 400) return "OpenRouter (오픈라우터)가 이 음성 요청을 받지 않았어요. 모델과 음성을 확인해 주세요.";
+  if (status === 401 || status === 403) return "OpenRouter (오픈라우터) API 키나 사용 권한을 확인해 주세요.";
+  if (status === 402) return "OpenRouter (오픈라우터) 잔액이 부족해요. 크레딧을 확인해 주세요.";
+  if (status === 429) return "OpenRouter (오픈라우터) 요청 한도에 도달했어요. 잠시 뒤 다시 시도해 주세요.";
+  return "OpenRouter (오픈라우터)에서 음성을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.";
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
@@ -357,6 +385,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const apiKey = process.env.OPENROUTER_API_KEY;
       if (!apiKey) return fail(res, 503, "OpenRouter (오픈라우터) API 키를 서버 설정에 등록해 주세요.");
       const usesDefaultVoice = model === "fish-audio/s2.1-pro-free:free";
+      const usesGeminiTts = (OPENROUTER_GEMINI_MODELS as readonly string[]).includes(model);
       const openRouterResponse = await fetch("https://openrouter.ai/api/v1/audio/speech", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -364,10 +393,26 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           model,
           input: text,
           ...(!usesDefaultVoice && { voice: voiceName }),
-          response_format: "mp3",
+          response_format: usesGeminiTts ? "pcm" : "mp3",
           ...(model === "microsoft/mai-voice-2-flash" && { speed: speakingRate }),
         }),
       });
+      if (usesGeminiTts) {
+        if (!openRouterResponse.ok) return fail(res, 502, openRouterFailureMessage(openRouterResponse.status));
+        const pcm = Buffer.from(await openRouterResponse.arrayBuffer());
+        if (pcm.byteLength === 0) return fail(res, 502, "OpenRouter (오픈라우터) 음성 결과가 비어 있어요. 다시 시도해 주세요.");
+        const contentType = openRouterResponse.headers.get("content-type") ?? "";
+        const sampleRate = Number(/(?:^|;)\s*rate=(\d+)/i.exec(contentType)?.[1] ?? 24000);
+        const channels = Number(/(?:^|;)\s*channels=(\d+)/i.exec(contentType)?.[1] ?? 1);
+        if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 48000 || !Number.isInteger(channels) || channels < 1 || channels > 2) {
+          return fail(res, 502, "OpenRouter (오픈라우터) 음성 형식을 읽지 못했어요.");
+        }
+        const wav = wrapPcmAsWav(pcm, sampleRate, channels);
+        res.setHeader("Content-Type", "audio/wav");
+        res.setHeader("Content-Length", wav.byteLength);
+        res.setHeader("Content-Disposition", "inline; filename=voice.wav");
+        return res.status(200).send(wav);
+      }
       return await sendAudio(openRouterResponse, res);
     }
 

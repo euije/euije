@@ -1,5 +1,16 @@
-import { loadTextToSpeech, loadVoiceStyle } from "./vendor/supertonic/helper";
+import { loadTextToSpeech, loadVoiceStyle, writeWavFile } from "./vendor/supertonic/helper";
 import * as ort from "onnxruntime-web/webgpu";
+import {
+  ALL_FORMATS,
+  BlobSource,
+  BufferTarget,
+  Conversion,
+  Input,
+  Mp3OutputFormat,
+  Output,
+  canEncodeAudio,
+} from "mediabunny";
+import { registerMp3Encoder } from "@mediabunny/mp3-encoder";
 
 const MODEL_REVISION = "3cadd1ee6394adea1bd021217a0e650ede09a323";
 const MODEL_ROOT = `https://huggingface.co/Supertone/supertonic-3/resolve/${MODEL_REVISION}`;
@@ -40,26 +51,19 @@ function loadStyle(voiceName: string) {
   return stylePromise;
 }
 
-async function floatPcmToMp3(samples: number[], sampleRate: number) {
-  const { default: lamejs } = await import("lamejs");
-  const encoder = new lamejs.Mp3Encoder(1, sampleRate, 128);
-  const mp3Parts: Uint8Array[] = [];
-  const frameSize = 1152;
+async function wavToMp3(wavBuffer: ArrayBuffer) {
+  if (!(await canEncodeAudio("mp3"))) registerMp3Encoder();
 
-  for (let offset = 0; offset < samples.length; offset += frameSize) {
-    const length = Math.min(frameSize, samples.length - offset);
-    const frame = new Int16Array(length);
-    for (let index = 0; index < length; index += 1) {
-      const value = Math.max(-1, Math.min(1, samples[offset + index]));
-      frame[index] = value < 0 ? Math.round(value * 32768) : Math.round(value * 32767);
-    }
-    const encoded = encoder.encodeBuffer(frame);
-    if (encoded.length) mp3Parts.push(new Uint8Array(encoded.buffer, encoded.byteOffset, encoded.byteLength));
-  }
-
-  const finalFrame = encoder.flush();
-  if (finalFrame.length) mp3Parts.push(new Uint8Array(finalFrame.buffer, finalFrame.byteOffset, finalFrame.byteLength));
-  return new Blob(mp3Parts, { type: "audio/mpeg" });
+  const input = new Input({
+    source: new BlobSource(new Blob([wavBuffer], { type: "audio/wav" })),
+    formats: ALL_FORMATS,
+  });
+  const target = new BufferTarget();
+  const output = new Output({ format: new Mp3OutputFormat(), target });
+  const conversion = await Conversion.init({ input, output });
+  await conversion.execute();
+  if (!target.buffer) throw new Error("MP3 변환 결과를 만들지 못했어요.");
+  return new Blob([target.buffer], { type: "audio/mpeg" });
 }
 
 export async function synthesizeSupertonicMp3(
@@ -74,6 +78,7 @@ export async function synthesizeSupertonicMp3(
   const style = await loadStyle(voiceName);
   onStatus("이 기기에서 한국어 음성을 만들고 있어요.");
   const result = await textToSpeech.call(text, "ko", style, 8, speed);
+  const wav = writeWavFile(result.wav, cfgs.ae.sample_rate) as ArrayBuffer;
   onStatus("MP3 파일로 변환하고 있어요.");
-  return await floatPcmToMp3(result.wav, cfgs.ae.sample_rate);
+  return await wavToMp3(wav);
 }

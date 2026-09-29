@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 type ProviderId = "google" | "openrouter" | "azure" | "elevenlabs";
@@ -74,8 +75,10 @@ const CLOUD_PROVIDERS = new Set<ProviderId>(["google", "openrouter", "azure", "e
 const recentRequests = new Map<string, number[]>();
 const WINDOW_MS = 10 * 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 200;
-const MAX_CHARACTERS = 1200;
-const MAX_TEXT_BYTES = 4900;
+const TURNSTILE_SESSION_COOKIE = "tts_challenge_session";
+const TURNSTILE_SESSION_TTL_MS = 30 * 60 * 1000;
+const MAX_CHARACTERS = 5000;
+const GOOGLE_CLOUD_MAX_TEXT_BYTES = 5000;
 
 function fail(res: ApiResponse, status: number, error: string) {
   return res.status(status).json({ error });
@@ -88,6 +91,45 @@ function getClientIp(req: ApiRequest) {
   }
   const realIp = req.headers["x-real-ip"];
   return typeof realIp === "string" ? realIp.slice(0, 64) : "unknown";
+}
+
+function getCookieValue(req: ApiRequest, name: string) {
+  const cookieHeader = req.headers.cookie;
+  if (typeof cookieHeader !== "string") return "";
+  const prefix = `${name}=`;
+  const cookie = cookieHeader.split(";").map((part) => part.trim()).find((part) => part.startsWith(prefix));
+  return cookie ? cookie.slice(prefix.length) : "";
+}
+
+function getValidTurnstileSession(req: ApiRequest, ip: string, secret: string, now: number) {
+  const value = getCookieValue(req, TURNSTILE_SESSION_COOKIE);
+  const separator = value.indexOf(".");
+  if (separator < 1) return 0;
+
+  const expiresAt = Number(value.slice(0, separator));
+  const signature = value.slice(separator + 1);
+  if (!Number.isSafeInteger(expiresAt) || expiresAt <= now || expiresAt > now + TURNSTILE_SESSION_TTL_MS + 60_000) return 0;
+  if (!/^[0-9a-f]{64}$/i.test(signature)) return 0;
+
+  const expected = createHmac("sha256", secret).update(`${expiresAt}.${ip}`).digest();
+  const provided = Buffer.from(signature, "hex");
+  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return 0;
+  return expiresAt;
+}
+
+function setTurnstileSession(res: ApiResponse, ip: string, secret: string, now: number, secure: boolean) {
+  const expiresAt = now + TURNSTILE_SESSION_TTL_MS;
+  const signature = createHmac("sha256", secret).update(`${expiresAt}.${ip}`).digest("hex");
+  const cookie = [
+    `${TURNSTILE_SESSION_COOKIE}=${expiresAt}.${signature}`,
+    "Path=/api",
+    "HttpOnly",
+    "SameSite=Strict",
+    `Max-Age=${Math.floor(TURNSTILE_SESSION_TTL_MS / 1000)}`,
+    ...(secure ? ["Secure"] : []),
+  ].join("; ");
+  res.setHeader("Set-Cookie", cookie);
+  res.setHeader("X-TTS-Session-Expires", String(expiresAt));
 }
 
 function allowRequest(ip: string, now: number) {
@@ -205,12 +247,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   const text = typeof body.text === "string" ? body.text.trim() : "";
   if (!text) return fail(res, 400, "읽을 문장을 입력해 주세요.");
-  if (Array.from(text).length > MAX_CHARACTERS || Buffer.byteLength(text, "utf8") > MAX_TEXT_BYTES) {
+  if (Array.from(text).length > MAX_CHARACTERS) {
     return fail(res, 400, `한 번에 ${MAX_CHARACTERS.toLocaleString()}자까지 만들 수 있어요.`);
   }
 
   const provider = body.provider as ProviderId;
   const model = typeof body.model === "string" ? body.model : "";
+  if (
+    provider === "google" &&
+    !(GEMINI_TTS_MODELS as readonly string[]).includes(model) &&
+    Buffer.byteLength(text, "utf8") > GOOGLE_CLOUD_MAX_TEXT_BYTES
+  ) {
+    return fail(res, 400, "Google Cloud TTS (구글 클라우드 음성 변환)는 요청당 5,000바이트까지 지원해요.");
+  }
   const gender = body.gender as Gender;
   const voiceName = typeof body.voiceName === "string" ? body.voiceName : "";
   const speakingRate = body.speakingRate;
@@ -237,16 +286,27 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (!voiceIsAllowed) return fail(res, 400, "선택한 모델이나 음성을 사용할 수 없어요.");
 
   try {
-    if (process.env.VERCEL && !process.env.TURNSTILE_SECRET_KEY) {
+    const turnstileSecret = process.env.TURNSTILE_SECRET_KEY || "";
+    if (process.env.VERCEL && !turnstileSecret) {
       return fail(res, 503, "보안 확인 설정이 필요해요. 운영자에게 문의해 주세요.");
     }
-    const validTurnstile = await verifyTurnstile(
-      typeof body.turnstileToken === "string" ? body.turnstileToken : "",
-      ip,
-    );
-    if (!validTurnstile) return fail(res, 403, "보안 확인을 마친 뒤 다시 시도해 주세요.");
+    const now = Date.now();
+    const existingSession = turnstileSecret
+      ? getValidTurnstileSession(req, ip, turnstileSecret, now)
+      : 0;
+    if (!existingSession) {
+      const validTurnstile = await verifyTurnstile(
+        typeof body.turnstileToken === "string" ? body.turnstileToken : "",
+        ip,
+      );
+      if (!validTurnstile) return fail(res, 403, "보안 확인을 마친 뒤 다시 시도해 주세요.");
+    }
     if (!allowRequest(ip, Date.now())) {
       return fail(res, 429, "10분 동안 생성할 수 있는 횟수를 넘었어요. 잠시 뒤 다시 시도해 주세요.");
+    }
+    if (turnstileSecret) {
+      const secure = Boolean(process.env.VERCEL) || req.headers["x-forwarded-proto"]?.split(",")[0].trim() === "https";
+      setTurnstileSession(res, ip, turnstileSecret, Date.now(), secure);
     }
   } catch {
     return fail(res, 503, "보안 확인을 할 수 없어요. 잠시 후 다시 시도해 주세요.");

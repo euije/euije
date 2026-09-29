@@ -434,6 +434,10 @@
 .text-heading { margin-bottom: 13px; }
 
 .char-count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   color: #425248;
   font-size: 13px;
   font-weight: 650;
@@ -442,6 +446,8 @@
 
 .char-count span { color: #a3aba6; font-weight: 450; }
 .char-count.over-limit { color: #bc5143; }
+.byte-count { color: #8a948f; font-size: 11px; font-weight: 500; white-space: nowrap; }
+.byte-count.over-limit { color: #bc5143; }
 
 .script-input {
   display: block;
@@ -638,6 +644,7 @@
   .audio-result audio { grid-column: 1 / -1; grid-row: 2; }
   .download-button { grid-column: 2; grid-row: 1; }
   .page-footer { gap: 8px; font-size: 10px; }
+  .byte-count { font-size: 10px; }
 }
 
 @media (max-width: 360px) {

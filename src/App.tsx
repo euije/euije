@@ -132,9 +132,35 @@ const DEFAULT_MODELS: Record<ProviderId, string> = {
   supertonic: "supertonic-3",
 };
 
-const MAX_CHARACTERS = 1200;
-const SUPERTONIC_MAX_CHARACTERS = 500;
+const MAX_CHARACTERS = 5000;
+const GOOGLE_CLOUD_MAX_TEXT_BYTES = 5000;
 const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY;
+const TURNSTILE_SESSION_STORAGE_KEY = "tts-turnstile-session-expires";
+
+function readTurnstileSessionExpiry() {
+  try {
+    const expiresAt = Number(window.sessionStorage.getItem(TURNSTILE_SESSION_STORAGE_KEY));
+    return Number.isFinite(expiresAt) && expiresAt > Date.now() ? expiresAt : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function storeTurnstileSessionExpiry(expiresAt: number) {
+  try {
+    window.sessionStorage.setItem(TURNSTILE_SESSION_STORAGE_KEY, String(expiresAt));
+  } catch {
+    // The signed server cookie still works if session storage is unavailable.
+  }
+}
+
+function clearTurnstileSessionExpiry() {
+  try {
+    window.sessionStorage.removeItem(TURNSTILE_SESSION_STORAGE_KEY);
+  } catch {
+    // The session will expire on the server even if local storage is unavailable.
+  }
+}
 
 function getStaticVoices(provider: ProviderId, model: string, gender: Gender) {
   if (provider === "google") {
@@ -231,15 +257,20 @@ function TtsApp() {
   const [honeypot, setHoneypot] = useState("");
   const [startedAt] = useState(() => performance.now());
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileSessionExpiresAt, setTurnstileSessionExpiresAt] = useState(readTurnstileSessionExpiry);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetIdRef = useRef<string | undefined>(undefined);
   const modelOptions = MODEL_OPTIONS[provider];
   const modelInfo = modelOptions.find((item) => item.id === model) ?? modelOptions[0];
   const speedSupported = modelInfo.supportsSpeed !== false;
   const genderSupported = !(provider === "openrouter" && model === "fish-audio/s2.1-pro-free:free");
+  const hasTurnstileSession = turnstileSessionExpiresAt > Date.now();
   const voices = provider === "elevenlabs" ? elevenVoices : getStaticVoices(provider, model, gender);
-  const characterLimit = provider === "supertonic" ? SUPERTONIC_MAX_CHARACTERS : MAX_CHARACTERS;
+  const characterLimit = MAX_CHARACTERS;
   const characterCount = Array.from(text).length;
+  const textByteCount = new TextEncoder().encode(text.trim()).length;
+  const hasGoogleCloudByteLimit = provider === "google" && !GEMINI_MODELS.includes(model);
+  const exceedsTextLimit = characterCount > characterLimit || (hasGoogleCloudByteLimit && textByteCount > GOOGLE_CLOUD_MAX_TEXT_BYTES);
   const selectedVoiceLabel = voices.find((voice) => voice.id === voiceName)?.name ?? voiceName;
   const audioMetadata = {
     text: text.trim(),
@@ -254,6 +285,20 @@ function TtsApp() {
     if (!audioUrl) return;
     return () => URL.revokeObjectURL(audioUrl);
   }, [audioUrl]);
+
+  useEffect(() => {
+    if (turnstileSessionExpiresAt <= 0) return;
+    const delay = Math.max(0, turnstileSessionExpiresAt - Date.now());
+    const timer = window.setTimeout(() => {
+      setTurnstileSessionExpiresAt(0);
+      clearTurnstileSessionExpiry();
+      setTurnstileToken("");
+      if (turnstileWidgetIdRef.current && window.turnstile) {
+        window.turnstile.reset(turnstileWidgetIdRef.current);
+      }
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [turnstileSessionExpiresAt]);
 
   useEffect(() => {
     if (!downloadUrl) return;
@@ -376,6 +421,7 @@ function TtsApp() {
     setLoading(true);
     setError("");
     clearAudio();
+    let turnstileSessionActive = hasTurnstileSession;
 
     try {
       if (provider === "supertonic") {
@@ -403,6 +449,16 @@ function TtsApp() {
           turnstileToken,
         }),
       });
+      const sessionExpiry = Number(response.headers.get("X-TTS-Session-Expires"));
+      if (Number.isFinite(sessionExpiry) && sessionExpiry > Date.now()) {
+        turnstileSessionActive = true;
+        setTurnstileSessionExpiresAt(sessionExpiry);
+        storeTurnstileSessionExpiry(sessionExpiry);
+      } else if (response.status === 403) {
+        turnstileSessionActive = false;
+        setTurnstileSessionExpiresAt(0);
+        clearTurnstileSessionExpiry();
+      }
       if (!response.ok) {
         const result = (await response.json()) as { error?: string };
         throw new Error(result.error || "음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
@@ -424,7 +480,7 @@ function TtsApp() {
           : "음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.",
       );
     } finally {
-      if (provider !== "supertonic" && TURNSTILE_SITE_KEY && turnstileWidgetIdRef.current && window.turnstile) {
+      if (provider !== "supertonic" && TURNSTILE_SITE_KEY && turnstileWidgetIdRef.current && window.turnstile && !turnstileSessionActive) {
         window.turnstile.reset(turnstileWidgetIdRef.current);
         setTurnstileToken("");
       }
@@ -515,6 +571,7 @@ function TtsApp() {
             ))}
           </div>
           <p className="price-note">{modelInfo.price}{provider === "google" && <span> · {GEMINI_MODELS.includes(model) ? "Gemini API (제미나이 API)" : "Google Cloud TTS (구글 클라우드 음성 변환)"} 요금</span>}</p>
+          {hasGoogleCloudByteLimit && <p className="provider-note">Google Cloud TTS API (구글 클라우드 음성 변환 API)는 요청당 최대 5,000바이트까지 받아요.</p>}
           {provider === "openrouter" && model === "fish-audio/s2.1-pro-free:free" && <p className="provider-note">Fish Audio (피시 오디오) 무료 모델이며 기본 음성을 사용합니다. 무료 제공과 처리량은 OpenRouter (오픈라우터)와 Fish Audio (피시 오디오)의 정책에 따라 달라질 수 있어요.</p>}
           {provider === "openrouter" && model === "microsoft/mai-voice-2-flash" && <p className="provider-note">OpenRouter (오픈라우터)를 통해 한국어 Haena (해나, 여성)·Junho (준호, 남성) 음성을 사용합니다.</p>}
           {provider === "supertonic" && <p className="provider-note">모델을 기기에 저장해 다음 실행부터 재사용합니다. 처음 받을 때 약 400MB (400메가바이트)가 필요해요. <a href="https://huggingface.co/Supertone/supertonic-3" target="_blank" rel="noreferrer">Hugging Face (허깅페이스)의 모델 이용 조건</a>을 확인해 주세요.</p>}
@@ -600,8 +657,9 @@ function TtsApp() {
             <span className="section-kicker">02 / SCRIPT (읽을 문장)</span>
             <h2>읽을 문장</h2>
           </div>
-          <span className={`char-count ${characterCount > characterLimit ? "over-limit" : ""}`}>
-            {characterCount.toLocaleString()} <span>/ {characterLimit.toLocaleString()}</span>
+          <span className={`char-count ${exceedsTextLimit ? "over-limit" : ""}`}>
+            {characterCount.toLocaleString()} <span>/ {characterLimit.toLocaleString()}자</span>
+            {hasGoogleCloudByteLimit && <small className={textByteCount > GOOGLE_CLOUD_MAX_TEXT_BYTES ? "byte-count over-limit" : "byte-count"}>{textByteCount.toLocaleString()} / 5,000바이트</small>}
           </span>
         </div>
 
@@ -644,7 +702,7 @@ function TtsApp() {
         </div>
 
         {TURNSTILE_SITE_KEY && (
-          <div className="turnstile-area" style={{ display: provider === "supertonic" ? "none" : undefined }}>
+          <div className="turnstile-area" style={{ display: provider === "supertonic" || hasTurnstileSession ? "none" : undefined }}>
             <div ref={turnstileRef} />
           </div>
         )}
@@ -656,7 +714,7 @@ function TtsApp() {
             className="generate-button"
             type="button"
             onClick={generateAudio}
-            disabled={loading || voiceLoading || !voiceName || !text.trim() || characterCount > characterLimit || (provider !== "supertonic" && !!TURNSTILE_SITE_KEY && !turnstileToken)}
+            disabled={loading || voiceLoading || !voiceName || !text.trim() || exceedsTextLimit || (provider !== "supertonic" && !!TURNSTILE_SITE_KEY && !turnstileToken && !hasTurnstileSession)}
           >
             {loading ? (
               <><span className="spinner" /> 음성을 만들고 있어요</>

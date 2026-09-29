@@ -15,13 +15,13 @@ const stylePromises = new Map<string, Promise<any>>();
 function loadModel(onStatus: (message: string) => void) {
   if (!ttsPromise) {
     const executionProviders = "gpu" in navigator ? ["webgpu", "wasm"] : ["wasm"];
-    const progress = (name: string, index: number, total: number) => {
-      onStatus(`모델 불러오는 중 ${index}/${total}: ${name}`);
+    const progress = (_name: string, index: number, total: number) => {
+      onStatus(`모델을 불러오는 중이에요 (${index}/${total})`);
     };
     ttsPromise = loadTextToSpeech(ONNX_ROOT, { executionProviders }, progress)
       .catch(async (error: unknown) => {
         if (!executionProviders.includes("webgpu")) throw error;
-        onStatus("WebGPU를 사용할 수 없어 CPU 모드로 전환하고 있어요.");
+        onStatus("그래픽 가속을 사용할 수 없어 기본 처리 방식으로 전환하고 있어요.");
         return loadTextToSpeech(ONNX_ROOT, { executionProviders: ["wasm"] }, progress);
       })
       .catch((error: unknown) => {
@@ -47,13 +47,13 @@ export async function synthesizeSupertonicMp3(
   speed: number,
   onStatus: (message: string) => void,
 ) {
-  onStatus("Supertonic 3 모델 파일을 불러오는 중이에요. 처음에는 약 400MB를 내려받아요.");
+  onStatus("Supertonic 3 (수퍼토닉 3) 모델을 불러오는 중이에요. 첫 실행 때 약 400MB (400메가바이트)를 내려받아요.");
   const { textToSpeech, cfgs } = await loadModel(onStatus);
   onStatus("선택한 목소리를 준비하고 있어요.");
   const style = await loadStyle(voiceName);
   onStatus("이 기기에서 한국어 음성을 만들고 있어요.");
   const result = await textToSpeech.call(text, "ko", style, 8, speed);
   const wav = writeWavFile(result.wav, cfgs.ae.sample_rate) as ArrayBuffer;
-  onStatus("MP3 파일로 변환하고 있어요.");
+  onStatus("MP3 (엠피쓰리) 파일로 변환하고 있어요.");
   return await wavToMp3(wav);
 }

@@ -257,7 +257,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (provider === "google") {
       if ((GEMINI_TTS_MODELS as readonly string[]).includes(model)) {
         const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_TTS_API_KEY;
-        if (!apiKey) return fail(res, 503, "Google Gemini API 키를 서버 환경 변수에 설정해 주세요.");
+        if (!apiKey) return fail(res, 503, "Google Gemini API (구글 제미나이 API) 키를 서버 설정에 등록해 주세요.");
         const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -271,9 +271,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             generation_config: { speech_config: [{ voice: voiceName }] },
           }),
         });
-        if (!geminiResponse.ok) return fail(res, 502, "Google Gemini에서 음성을 만들지 못했어요. API 키와 모델 사용 권한을 확인해 주세요.");
+        if (!geminiResponse.ok) return fail(res, 502, "Google Gemini (구글 제미나이)에서 음성을 만들지 못했어요. API 키와 모델 사용 권한을 확인해 주세요.");
         const result = (await geminiResponse.json()) as { output_audio?: { data?: string } };
-        if (!result.output_audio?.data) return fail(res, 502, "Google Gemini 음성 결과가 비어 있어요.");
+        if (!result.output_audio?.data) return fail(res, 502, "Google Gemini (구글 제미나이) 음성 결과가 비어 있어요.");
         const audio = Buffer.from(result.output_audio.data, "base64");
         res.setHeader("Content-Type", "audio/wav");
         res.setHeader("Content-Length", audio.byteLength);
@@ -282,7 +282,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       }
 
       const apiKey = process.env.GOOGLE_TTS_API_KEY;
-      if (!apiKey) return fail(res, 503, "Google Cloud API 키를 서버 환경 변수에 설정해 주세요.");
+      if (!apiKey) return fail(res, 503, "Google Cloud (구글 클라우드) API 키를 서버 설정에 등록해 주세요.");
       const googleResponse = await fetch("https://texttospeech.googleapis.com/v1/text:synthesize", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey },
@@ -292,9 +292,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           audioConfig: { audioEncoding: "MP3", speakingRate },
         }),
       });
-      if (!googleResponse.ok) return fail(res, 502, "Google Cloud에서 음성을 만들지 못했어요.");
+      if (!googleResponse.ok) return fail(res, 502, "Google Cloud (구글 클라우드)에서 음성을 만들지 못했어요.");
       const result = (await googleResponse.json()) as { audioContent?: string };
-      if (!result.audioContent) return fail(res, 502, "Google Cloud 음성 결과가 비어 있어요.");
+      if (!result.audioContent) return fail(res, 502, "Google Cloud (구글 클라우드) 음성 결과가 비어 있어요.");
       const audio = Buffer.from(result.audioContent, "base64");
       res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Content-Length", audio.byteLength);
@@ -304,7 +304,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     if (provider === "openrouter") {
       const apiKey = process.env.OPENROUTER_API_KEY;
-      if (!apiKey) return fail(res, 503, "OpenRouter API 키를 서버 환경 변수에 설정해 주세요.");
+      if (!apiKey) return fail(res, 503, "OpenRouter (오픈라우터) API 키를 서버 설정에 등록해 주세요.");
       const usesDefaultVoice = model === "fish-audio/s2.1-pro-free:free";
       const openRouterResponse = await fetch("https://openrouter.ai/api/v1/audio/speech", {
         method: "POST",
@@ -322,9 +322,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     if (provider === "azure") {
       const apiKey = process.env.AZURE_SPEECH_KEY || process.env.AZURE_SPEECH_KEY2;
-      if (!apiKey) return fail(res, 503, "Azure Speech 키를 서버 환경 변수에 설정해 주세요.");
+      if (!apiKey) return fail(res, 503, "Azure Speech (애저 음성) 키를 서버 설정에 등록해 주세요.");
       const region = (process.env.AZURE_SPEECH_REGION || "koreacentral").toLowerCase();
-      if (!/^[a-z0-9-]+$/.test(region)) return fail(res, 500, "Azure Speech 지역 설정을 확인해 주세요.");
+      if (!/^[a-z0-9-]+$/.test(region)) return fail(res, 500, "Azure Speech (애저 음성) 지역 설정을 확인해 주세요.");
       const ssml = `<speak version="1.0" xml:lang="ko-KR"><voice name="${voiceName}" xml:lang="ko-KR"><prosody rate="${Math.round((speakingRate - 1) * 100)}%">${escapeXml(text)}</prosody></voice></speak>`;
       const azureResponse = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
         method: "POST",
@@ -340,7 +340,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey) return fail(res, 503, "ElevenLabs API 키를 서버 환경 변수에 설정해 주세요.");
+    if (!apiKey) return fail(res, 503, "ElevenLabs (일레븐랩스) API 키를 서버 설정에 등록해 주세요.");
     if (!await isKoreanPremadeVoiceAllowed(apiKey, voiceName, gender)) {
       return fail(res, 400, "한국어 기본 음성 목록에서 목소리를 선택해 주세요.");
     }

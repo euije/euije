@@ -10,33 +10,61 @@ type Voice = {
   name: string;
 };
 
+const VOICE_NAME_TRANSLATIONS: Record<string, string> = {
+  "Standard A": "표준 A", "Standard B": "표준 B", "Standard C": "표준 C", "Standard D": "표준 D",
+  "WaveNet A": "웨이브넷 A", "WaveNet B": "웨이브넷 B", "WaveNet C": "웨이브넷 C", "WaveNet D": "웨이브넷 D",
+  "Neural2 A": "뉴럴 2 A", "Neural2 B": "뉴럴 2 B", "Neural2 C": "뉴럴 2 C",
+  Achernar: "아케르나르", Aoede: "아오이데", Autonoe: "아우토노에", Callirrhoe: "칼리로에",
+  Despina: "데스피나", Erinome: "에리노메", Gacrux: "가크럭스", Kore: "코레",
+  Laomedeia: "라오메데이아", Leda: "레다", Pulcherrima: "풀케리마", Sulafat: "술라파트",
+  Vindemiatrix: "빈데미아트릭스", Zephyr: "제퍼", Achird: "아키르드", Algenib: "알게니브",
+  Algieba: "알기에바", Alnilam: "알닐람", Charon: "카론", Enceladus: "엔셀라두스",
+  Fenrir: "펜리르", Iapetus: "이아페투스", Orus: "오루스", Puck: "퍽",
+  Rasalgethi: "라살게티", Sadachbia: "사다크비아", Sadaltager: "사달타게르",
+  Schedar: "스케다르", Umbriel: "엄브리엘", Zubenelgenubi: "주벤엘게누비",
+  SunHi: "선희", JiMin: "지민", SeoHyeon: "서현", SoonBok: "순복", YuJin: "유진",
+  InJoon: "인준", BongJin: "봉진", GookMin: "국민", Hyunsu: "현수",
+  Haena: "해나", Junho: "준호", F1: "여성 음성 1번", F2: "여성 음성 2번",
+  F3: "여성 음성 3번", F4: "여성 음성 4번", F5: "여성 음성 5번",
+  M1: "남성 음성 1번", M2: "남성 음성 2번", M3: "남성 음성 3번",
+  M4: "남성 음성 4번", M5: "남성 음성 5번",
+  Alice: "앨리스", Aria: "아리아", Charlotte: "샬럿", Chris: "크리스", Daniel: "다니엘",
+  George: "조지", Grace: "그레이스", Jessica: "제시카", Liam: "리암", Lily: "릴리",
+  Matilda: "마틸다", Nicole: "니콜", Patrick: "패트릭", Rachel: "레이첼", Sam: "샘",
+  Sarah: "사라", Will: "윌",
+};
+
+function voiceLabel(name: string) {
+  return `${name} (${VOICE_NAME_TRANSLATIONS[name] ?? "한국어 음성"})`;
+}
+
 const GOOGLE_VOICES: Record<"standard" | "wavenet" | "neural2" | "chirp3hd", Record<Gender, Voice[]>> = {
   standard: {
-    FEMALE: [{ id: "ko-KR-Standard-A", name: "Standard A" }, { id: "ko-KR-Standard-B", name: "Standard B" }],
-    MALE: [{ id: "ko-KR-Standard-C", name: "Standard C" }, { id: "ko-KR-Standard-D", name: "Standard D" }],
+    FEMALE: [{ id: "ko-KR-Standard-A", name: voiceLabel("Standard A") }, { id: "ko-KR-Standard-B", name: voiceLabel("Standard B") }],
+    MALE: [{ id: "ko-KR-Standard-C", name: voiceLabel("Standard C") }, { id: "ko-KR-Standard-D", name: voiceLabel("Standard D") }],
   },
   wavenet: {
-    FEMALE: [{ id: "ko-KR-Wavenet-A", name: "WaveNet A" }, { id: "ko-KR-Wavenet-B", name: "WaveNet B" }],
-    MALE: [{ id: "ko-KR-Wavenet-C", name: "WaveNet C" }, { id: "ko-KR-Wavenet-D", name: "WaveNet D" }],
+    FEMALE: [{ id: "ko-KR-Wavenet-A", name: voiceLabel("WaveNet A") }, { id: "ko-KR-Wavenet-B", name: voiceLabel("WaveNet B") }],
+    MALE: [{ id: "ko-KR-Wavenet-C", name: voiceLabel("WaveNet C") }, { id: "ko-KR-Wavenet-D", name: voiceLabel("WaveNet D") }],
   },
   neural2: {
-    FEMALE: [{ id: "ko-KR-Neural2-A", name: "Neural2 A" }, { id: "ko-KR-Neural2-B", name: "Neural2 B" }],
-    MALE: [{ id: "ko-KR-Neural2-C", name: "Neural2 C" }],
+    FEMALE: [{ id: "ko-KR-Neural2-A", name: voiceLabel("Neural2 A") }, { id: "ko-KR-Neural2-B", name: voiceLabel("Neural2 B") }],
+    MALE: [{ id: "ko-KR-Neural2-C", name: voiceLabel("Neural2 C") }],
   },
   chirp3hd: {
-    FEMALE: ["Achernar", "Aoede", "Autonoe", "Callirrhoe", "Despina", "Erinome", "Gacrux", "Kore", "Laomedeia", "Leda", "Pulcherrima", "Sulafat", "Vindemiatrix", "Zephyr"].map((name) => ({ id: `ko-KR-Chirp3-HD-${name}`, name })),
-    MALE: ["Achird", "Algenib", "Algieba", "Alnilam", "Charon", "Enceladus", "Fenrir", "Iapetus", "Orus", "Puck", "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Umbriel", "Zubenelgenubi"].map((name) => ({ id: `ko-KR-Chirp3-HD-${name}`, name })),
+    FEMALE: ["Achernar", "Aoede", "Autonoe", "Callirrhoe", "Despina", "Erinome", "Gacrux", "Kore", "Laomedeia", "Leda", "Pulcherrima", "Sulafat", "Vindemiatrix", "Zephyr"].map((name) => ({ id: `ko-KR-Chirp3-HD-${name}`, name: voiceLabel(name) })),
+    MALE: ["Achird", "Algenib", "Algieba", "Alnilam", "Charon", "Enceladus", "Fenrir", "Iapetus", "Orus", "Puck", "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Umbriel", "Zubenelgenubi"].map((name) => ({ id: `ko-KR-Chirp3-HD-${name}`, name: voiceLabel(name) })),
   },
 };
 
 const GEMINI_VOICES: Record<Gender, Voice[]> = {
-  FEMALE: ["Achernar", "Aoede", "Autonoe", "Callirrhoe", "Despina", "Erinome", "Gacrux", "Kore", "Laomedeia", "Leda", "Pulcherrima", "Sulafat", "Vindemiatrix", "Zephyr"].map((name) => ({ id: name, name })),
-  MALE: ["Achird", "Algenib", "Algieba", "Alnilam", "Charon", "Enceladus", "Fenrir", "Iapetus", "Orus", "Puck", "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Umbriel", "Zubenelgenubi"].map((name) => ({ id: name, name })),
+  FEMALE: ["Achernar", "Aoede", "Autonoe", "Callirrhoe", "Despina", "Erinome", "Gacrux", "Kore", "Laomedeia", "Leda", "Pulcherrima", "Sulafat", "Vindemiatrix", "Zephyr"].map((name) => ({ id: name, name: voiceLabel(name) })),
+  MALE: ["Achird", "Algenib", "Algieba", "Alnilam", "Charon", "Enceladus", "Fenrir", "Iapetus", "Orus", "Puck", "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Umbriel", "Zubenelgenubi"].map((name) => ({ id: name, name: voiceLabel(name) })),
 };
 
 const AZURE_VOICES: Record<Gender, Voice[]> = {
-  FEMALE: ["SunHi", "JiMin", "SeoHyeon", "SoonBok", "YuJin"].map((name) => ({ id: `ko-KR-${name}Neural`, name })),
-  MALE: ["InJoon", "BongJin", "GookMin", "Hyunsu"].map((name) => ({ id: `ko-KR-${name}Neural`, name })),
+  FEMALE: ["SunHi", "JiMin", "SeoHyeon", "SoonBok", "YuJin"].map((name) => ({ id: `ko-KR-${name}Neural`, name: voiceLabel(name) })),
+  MALE: ["InJoon", "BongJin", "GookMin", "Hyunsu"].map((name) => ({ id: `ko-KR-${name}Neural`, name: voiceLabel(name) })),
 };
 
 const GEMINI_MODELS = ["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"];
@@ -49,47 +77,47 @@ const OPENROUTER_VOICES: Record<string, Record<Gender, Voice[]>> = {
     MALE: [{ id: "fish-default", name: "모델 기본 음성" }],
   },
   "microsoft/mai-voice-2-flash": {
-    FEMALE: [{ id: "ko-KR-Haena:MAI-Voice-2-Flash", name: "Haena" }],
-    MALE: [{ id: "ko-KR-Junho:MAI-Voice-2-Flash", name: "Junho" }],
+    FEMALE: [{ id: "ko-KR-Haena:MAI-Voice-2-Flash", name: voiceLabel("Haena") }],
+    MALE: [{ id: "ko-KR-Junho:MAI-Voice-2-Flash", name: voiceLabel("Junho") }],
   },
 };
 
 const MODEL_OPTIONS: Record<ProviderId, ModelChoice[]> = {
   google: [
-    { id: "standard", label: "Standard", detail: "가볍게 시작", price: "월 400만 자 무료 · 이후 $4 / 100만 자" },
-    { id: "neural2", label: "Neural2", detail: "균형 잡힌 음성", price: "월 100만 자 무료 · 이후 $16 / 100만 자" },
-    { id: "wavenet", label: "WaveNet", detail: "자연스러운 합성 음성", price: "월 100만 자 무료 · 이후 $16 / 100만 자" },
-    { id: "chirp3hd", label: "Chirp 3 HD", detail: "생성형 음성", price: "월 100만 자 무료 · 이후 $30 / 100만 자" },
-    { id: "gemini-3.8-flash-lite-tts", label: "Gemini Flash-Lite TTS", detail: "빠르고 비용 효율적", price: "Gemini API 종량제 · 토큰 기준", supportsSpeed: false },
-    { id: "gemini-3.8-flash-tts", label: "Gemini Flash TTS", detail: "표현력 중심", price: "Gemini API 종량제 · 토큰 기준", supportsSpeed: false },
+    { id: "standard", label: "Standard (표준 음성)", detail: "가볍게 시작", price: "월 400만 자 무료 · 이후 100만 자당 미화 4달러" },
+    { id: "neural2", label: "Neural2 (뉴럴 2)", detail: "균형 잡힌 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 16달러" },
+    { id: "wavenet", label: "WaveNet (웨이브넷)", detail: "자연스러운 합성 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 16달러" },
+    { id: "chirp3hd", label: "Chirp 3 HD (처프 3 고음질)", detail: "생성형 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 30달러" },
+    { id: "gemini-3.8-flash-lite-tts", label: "Gemini Flash-Lite TTS (제미나이 고속·경량 음성)", detail: "빠르고 비용 효율적", price: "Gemini API (제미나이 API) 종량제 · 사용 토큰 수 기준", supportsSpeed: false },
+    { id: "gemini-3.8-flash-tts", label: "Gemini Flash TTS (제미나이 고속 음성)", detail: "표현력 중심", price: "Gemini API (제미나이 API) 종량제 · 사용 토큰 수 기준", supportsSpeed: false },
   ],
   openrouter: [
-    { id: "fish-audio/s2.1-pro-free:free", label: "Fish Audio S2.1 Pro Free", detail: "무료 · 한국어 포함 83개 언어", price: "무료 · 사용량 정책 적용", supportsSpeed: false },
-    { id: "microsoft/mai-voice-2-flash", label: "MAI Voice-2 Flash", detail: "한국어 Haena · Junho", price: "$15 / 100만 자" },
+    { id: "fish-audio/s2.1-pro-free:free", label: "Fish Audio S2.1 Pro Free (피시 오디오 S2.1 프로 무료 모델)", detail: "무료 · 한국어 포함 83개 언어", price: "무료 · 사용량 정책 적용", supportsSpeed: false },
+    { id: "microsoft/mai-voice-2-flash", label: "MAI Voice-2 Flash (마이 음성 2 플래시)", detail: "한국어 Haena (해나) · Junho (준호)", price: "100만 자당 미화 15달러" },
   ],
   azure: [
-    { id: "neural", label: "Azure Neural", detail: "한국어 신경망 음성", price: "Azure 종량제 · 지역별 요금" },
+    { id: "neural", label: "Azure Neural (애저 신경망 음성)", detail: "한국어 신경망 음성", price: "Azure (애저) 사용량 기준 · 지역별 요금" },
   ],
   elevenlabs: [
-    { id: "eleven_multilingual_v2", label: "Multilingual v2", detail: "다국어 음성", price: "계정 크레딧에 따라 차감" },
-    { id: "eleven_flash_v2_5", label: "Flash v2.5", detail: "빠른 합성", price: "계정 크레딧에 따라 차감" },
+    { id: "eleven_multilingual_v2", label: "Multilingual v2 (다국어 버전 2)", detail: "다국어 음성", price: "계정에 남은 크레딧에서 차감" },
+    { id: "eleven_flash_v2_5", label: "Flash v2.5 (빠른 합성 버전 2.5)", detail: "빠른 합성", price: "계정에 남은 크레딧에서 차감" },
   ],
   supertonic: [
-    { id: "supertonic-3", label: "Supertonic 3", detail: "기기에서 직접 생성", price: "브라우저 로컬 실행 · 첫 다운로드 약 400MB" },
+    { id: "supertonic-3", label: "Supertonic 3 (수퍼토닉 3)", detail: "기기에서 직접 생성", price: "기기에서 실행 · 첫 다운로드 약 400MB (400메가바이트)" },
   ],
 };
 
 const PROVIDERS: { id: ProviderId; label: string }[] = [
-  { id: "google", label: "Google Cloud · Gemini API" },
-  { id: "openrouter", label: "OpenRouter" },
-  { id: "azure", label: "Azure Speech" },
-  { id: "elevenlabs", label: "ElevenLabs" },
-  { id: "supertonic", label: "Supertonic 3 · 이 기기에서 실행" },
+  { id: "google", label: "Google Cloud (구글 클라우드)" },
+  { id: "openrouter", label: "OpenRouter (오픈라우터)" },
+  { id: "azure", label: "Azure Speech (애저 음성)" },
+  { id: "elevenlabs", label: "ElevenLabs (일레븐랩스)" },
+  { id: "supertonic", label: "Supertonic 3 (수퍼토닉 3) · 이 기기에서 실행" },
 ];
 
 const SUPERTONIC_VOICES: Record<Gender, Voice[]> = {
-  FEMALE: ["F1", "F2", "F3", "F4", "F5"].map((name) => ({ id: name, name })),
-  MALE: ["M1", "M2", "M3", "M4", "M5"].map((name) => ({ id: name, name })),
+  FEMALE: ["F1", "F2", "F3", "F4", "F5"].map((name) => ({ id: name, name: voiceLabel(name) })),
+  MALE: ["M1", "M2", "M3", "M4", "M5"].map((name) => ({ id: name, name: voiceLabel(name) })),
 };
 
 const DEFAULT_MODELS: Record<ProviderId, string> = {
@@ -116,7 +144,7 @@ function getStaticVoices(provider: ProviderId, model: string, gender: Gender) {
 }
 
 function providerInfoLabel(provider: ProviderId) {
-  if (provider === "supertonic") return "Supertonic 3 · 로컬";
+  if (provider === "supertonic") return "Supertonic 3 (수퍼토닉 3) · 이 기기";
   return PROVIDERS.find((item) => item.id === provider)?.label ?? "음성 서비스";
 }
 
@@ -127,6 +155,7 @@ declare global {
         container: HTMLElement,
         options: {
           sitekey: string;
+          language?: string;
           callback: (token: string) => void;
           "expired-callback"?: () => void;
           "error-callback"?: () => void;
@@ -222,6 +251,7 @@ function TtsApp() {
       if (!window.turnstile || widgetId) return;
       widgetId = window.turnstile.render(container, {
         sitekey: TURNSTILE_SITE_KEY,
+        language: "ko",
         callback: setTurnstileToken,
         "expired-callback": () => setTurnstileToken(""),
         "error-callback": () => setTurnstileToken(""),
@@ -231,7 +261,7 @@ function TtsApp() {
 
     if (!script) {
       script = document.createElement("script");
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&hl=ko";
       script.async = true;
       script.defer = true;
       script.dataset.turnstile = "true";
@@ -263,16 +293,16 @@ function TtsApp() {
     fetch(`/api/voices?provider=elevenlabs&gender=${gender.toLowerCase()}`)
       .then(async (response) => {
         const result = (await response.json()) as { voices?: Voice[]; error?: string };
-        if (!response.ok) throw new Error(result.error || "ElevenLabs 음성을 불러오지 못했어요.");
+        if (!response.ok) throw new Error(result.error || "ElevenLabs (일레븐랩스) 음성을 불러오지 못했어요.");
         return result.voices ?? [];
       })
       .then((items) => {
         if (!active) return;
-        setElevenVoices(items);
+        setElevenVoices(items.map((voice) => ({ ...voice, name: voiceLabel(voice.name) })));
         setVoiceName((current) => items.some((voice) => voice.id === current) ? current : items[0]?.id ?? "");
       })
       .catch((caught) => {
-        if (active) setError(caught instanceof Error ? caught.message : "ElevenLabs 음성을 불러오지 못했어요.");
+        if (active) setError(caught instanceof Error ? caught.message : "ElevenLabs (일레븐랩스) 음성을 불러오지 못했어요.");
       })
       .finally(() => {
         if (active) setVoiceLoading(false);
@@ -389,7 +419,7 @@ function TtsApp() {
 
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-copy">
-          <div className="eyebrow"><span /> KOREAN TEXT TO SPEECH</div>
+          <div className="eyebrow"><span /> KOREAN TTS (한국어 텍스트 음성 변환)</div>
           <h1 id="hero-title">글에 목소리를<br />더해 보세요.</h1>
           <p>읽고 싶은 문장을 넣고, 마음에 드는 목소리를 골라 보세요.</p>
         </div>
@@ -409,7 +439,7 @@ function TtsApp() {
       <section className="studio-card" aria-label="음성 만들기">
         <div className="card-heading">
           <div>
-            <span className="section-kicker">01 / VOICE</span>
+            <span className="section-kicker">01 / VOICE (목소리)</span>
             <h2>목소리 설정</h2>
           </div>
           <span className="language-badge"><span className="language-dot" /> 한국어</span>
@@ -417,7 +447,7 @@ function TtsApp() {
 
         <div className="field-block provider-field">
           <div className="field-heading">
-            <label htmlFor="provider">TTS 서비스</label>
+            <label htmlFor="provider">TTS 서비스 (텍스트 음성 변환 서비스)</label>
             <span className="field-hint">생성 방식을 선택해요</span>
           </div>
           <div className="select-wrap">
@@ -452,10 +482,10 @@ function TtsApp() {
               </button>
             ))}
           </div>
-          <p className="price-note">{modelInfo.price}{provider === "google" && <span> · USD, {GEMINI_MODELS.includes(model) ? "Gemini API" : "Google Cloud TTS"} 기준</span>}</p>
-          {provider === "openrouter" && model === "fish-audio/s2.1-pro-free:free" && <p className="provider-note">무료 모델이며 기본 음성을 사용합니다. 무료 제공과 처리량은 OpenRouter·Fish Audio의 정책에 따라 달라질 수 있어요.</p>}
-          {provider === "openrouter" && model === "microsoft/mai-voice-2-flash" && <p className="provider-note">OpenRouter를 통해 한국어 Haena(여성)·Junho(남성) 음성을 사용합니다.</p>}
-          {provider === "supertonic" && <p className="provider-note">첫 실행 때 약 400MB를 내려받아요. <a href="https://huggingface.co/Supertone/supertonic-3" target="_blank" rel="noreferrer">모델 이용 조건</a>을 확인해 주세요.</p>}
+          <p className="price-note">{modelInfo.price}{provider === "google" && <span> · {GEMINI_MODELS.includes(model) ? "Gemini API (제미나이 API)" : "Google Cloud TTS (구글 클라우드 음성 변환)"} 요금</span>}</p>
+          {provider === "openrouter" && model === "fish-audio/s2.1-pro-free:free" && <p className="provider-note">Fish Audio (피시 오디오) 무료 모델이며 기본 음성을 사용합니다. 무료 제공과 처리량은 OpenRouter (오픈라우터)와 Fish Audio (피시 오디오)의 정책에 따라 달라질 수 있어요.</p>}
+          {provider === "openrouter" && model === "microsoft/mai-voice-2-flash" && <p className="provider-note">OpenRouter (오픈라우터)를 통해 한국어 Haena (해나, 여성)·Junho (준호, 남성) 음성을 사용합니다.</p>}
+          {provider === "supertonic" && <p className="provider-note">첫 실행 때 약 400MB (400메가바이트)를 내려받습니다. <a href="https://huggingface.co/Supertone/supertonic-3" target="_blank" rel="noreferrer">Hugging Face (허깅페이스)의 모델 이용 조건</a>을 확인해 주세요.</p>}
           {provider !== "supertonic" && <p className="provider-note">입력 문장은 선택한 TTS 서비스로 전송돼요.</p>}
         </div>
 
@@ -535,7 +565,7 @@ function TtsApp() {
 
         <div className="card-heading text-heading">
           <div>
-            <span className="section-kicker">02 / SCRIPT</span>
+            <span className="section-kicker">02 / SCRIPT (읽을 문장)</span>
             <h2>읽을 문장</h2>
           </div>
           <span className={`char-count ${characterCount > characterLimit ? "over-limit" : ""}`}>
@@ -569,7 +599,7 @@ function TtsApp() {
         </div>
 
         <div className="honeypot" aria-hidden="true">
-          <label htmlFor="website">Leave this field empty</label>
+          <label htmlFor="website">이 입력칸은 비워 두세요.</label>
           <input
             id="website"
             name="website"
@@ -602,21 +632,21 @@ function TtsApp() {
               <><Icon name="play" /> 미리 듣기</>
             )}
           </button>
-          <span className="action-caption">{generationNote || "생성 후 재생하고 MP3로 저장할 수 있어요"}</span>
+          <span className="action-caption">{generationNote || "생성 후 미리 듣고 MP3 (엠피쓰리) 파일로 저장할 수 있어요"}</span>
         </div>
 
         {audioUrl && (
           <div className="audio-result" aria-live="polite">
             <div className="result-title">
               <span className="result-icon"><Icon name="play" /></span>
-              <div><strong>음성이 준비됐어요</strong><span>MP3 · {providerInfoLabel(provider)} · {modelInfo.label} · {speedSupported ? `${speed.toFixed(2)}×` : "기본 속도"}</span></div>
+              <div><strong>음성이 준비됐어요</strong><span>MP3 (엠피쓰리) · {providerInfoLabel(provider)} · {modelInfo.label} · {speedSupported ? `${speed.toFixed(2)}×` : "기본 속도"}</span></div>
             </div>
             <audio controls src={audioUrl} aria-label="생성된 음성 미리 듣기" />
             <a
               className="download-button"
               href={audioUrl}
-              download="text-to-speech.mp3"
-            ><Icon name="download" /> MP3 다운로드</a>
+              download="텍스트-스피치.mp3"
+            ><Icon name="download" /> MP3 (엠피쓰리) 내려받기</a>
           </div>
         )}
       </section>

@@ -42,7 +42,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   }
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) return fail(res, 503, "ElevenLabs API 키를 서버 환경 변수에 설정해 주세요.");
+  if (!apiKey) return fail(res, 503, "ElevenLabs (일레븐랩스) API 키를 서버 설정에 등록해 주세요.");
 
   try {
     const query = new URLSearchParams({
@@ -55,7 +55,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const upstream = await fetch(`https://api.elevenlabs.io/v2/voices?${query.toString()}`, {
       headers: { "xi-api-key": apiKey },
     });
-    if (!upstream.ok) return fail(res, 502, "ElevenLabs 음성 목록을 불러오지 못했어요.");
+    if (!upstream.ok) return fail(res, 502, "ElevenLabs (일레븐랩스) 음성 목록을 불러오지 못했어요.");
 
     const result = (await upstream.json()) as {
       voices?: Array<{ voice_id?: string; name?: string; labels?: Record<string, string> }>;
@@ -65,6 +65,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       .map((voice) => ({ id: voice.voice_id, name: voice.name }));
     return res.status(200).json({ voices });
   } catch {
-    return fail(res, 502, "ElevenLabs 음성 목록을 불러오지 못했어요.");
+    return fail(res, 502, "ElevenLabs (일레븐랩스) 음성 목록을 불러오지 못했어요.");
   }
 }

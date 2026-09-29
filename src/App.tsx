@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
+import { addId3Metadata, createMp3Filename } from "./mp3-metadata";
 import "./App.css";
 
 type ProviderId = "google" | "openrouter" | "azure" | "elevenlabs" | "supertonic";
@@ -224,6 +225,7 @@ function TtsApp() {
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [generationNote, setGenerationNote] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [elevenVoices, setElevenVoices] = useState<Voice[]>([]);
   const [honeypot, setHoneypot] = useState("");
@@ -238,11 +240,30 @@ function TtsApp() {
   const voices = provider === "elevenlabs" ? elevenVoices : getStaticVoices(provider, model, gender);
   const characterLimit = provider === "supertonic" ? SUPERTONIC_MAX_CHARACTERS : MAX_CHARACTERS;
   const characterCount = Array.from(text).length;
+  const selectedVoiceLabel = voices.find((voice) => voice.id === voiceName)?.name ?? voiceName;
+  const audioMetadata = {
+    text: text.trim(),
+    service: providerInfoLabel(provider),
+    model: modelInfo.label,
+    gender: genderSupported ? (gender === "FEMALE" ? "여성" : "남성") : "모델 기본",
+    voice: selectedVoiceLabel,
+  };
+  const downloadFilename = createMp3Filename(audioMetadata);
 
   useEffect(() => {
     if (!audioUrl) return;
     return () => URL.revokeObjectURL(audioUrl);
   }, [audioUrl]);
+
+  useEffect(() => {
+    if (!downloadUrl) return;
+    return () => URL.revokeObjectURL(downloadUrl);
+  }, [downloadUrl]);
+
+  const clearAudio = () => {
+    setAudioUrl(null);
+    setDownloadUrl(null);
+  };
 
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY || !turnstileRef.current) return;
@@ -322,7 +343,7 @@ function TtsApp() {
   const changeText = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setText(event.target.value);
     setError("");
-    if (audioUrl) setAudioUrl(null);
+    clearAudio();
   };
 
   const chooseProvider = (nextProvider: ProviderId) => {
@@ -331,7 +352,7 @@ function TtsApp() {
     setVoiceName(getStaticVoices(nextProvider, DEFAULT_MODELS[nextProvider], gender)[0]?.id ?? "");
     setElevenVoices([]);
     setError("");
-    setAudioUrl(null);
+    clearAudio();
   };
 
   const chooseModel = (nextModel: string) => {
@@ -340,27 +361,29 @@ function TtsApp() {
       setVoiceName(getStaticVoices(provider, nextModel, gender)[0]?.id ?? "");
     }
     setError("");
-    setAudioUrl(null);
+    clearAudio();
   };
 
   const chooseGender = (nextGender: Gender) => {
     setGender(nextGender);
     setVoiceName(getStaticVoices(provider, model, nextGender)[0]?.id ?? "");
     setError("");
-    setAudioUrl(null);
+    clearAudio();
   };
 
   const generateAudio = async () => {
     if (!text.trim() || loading || voiceLoading || !voiceName) return;
     setLoading(true);
     setError("");
-    setAudioUrl(null);
+    clearAudio();
 
     try {
       if (provider === "supertonic") {
         setGenerationNote("기기에서 음성을 만들고 있어요. 첫 실행은 모델 다운로드가 필요해요.");
         const { synthesizeSupertonicMp3 } = await import("./supertonic");
         const audioBlob = await synthesizeSupertonicMp3(text.trim(), voiceName, speed, setGenerationNote);
+        const taggedBlob = await addId3Metadata(audioBlob, audioMetadata);
+        setDownloadUrl(URL.createObjectURL(taggedBlob));
         setAudioUrl(URL.createObjectURL(audioBlob));
         return;
       }
@@ -391,6 +414,8 @@ function TtsApp() {
         const { wavToMp3 } = await import("./audio");
         audioBlob = await wavToMp3(await audioBlob.arrayBuffer());
       }
+      const taggedBlob = await addId3Metadata(audioBlob, audioMetadata);
+      setDownloadUrl(URL.createObjectURL(taggedBlob));
       setAudioUrl(URL.createObjectURL(audioBlob));
     } catch (caught) {
       setError(
@@ -530,7 +555,7 @@ function TtsApp() {
                 value={voiceName}
                 onChange={(event) => {
                   setVoiceName(event.target.value);
-                  setAudioUrl(null);
+                  clearAudio();
                 }}
                 disabled={voiceLoading || voices.length === 0}
               >
@@ -561,7 +586,7 @@ function TtsApp() {
             disabled={!speedSupported}
             onChange={(event) => {
               setSpeed(Number(event.target.value));
-              setAudioUrl(null);
+              clearAudio();
             }}
             style={{ "--range-progress": `${((speed - 0.7) / 0.5) * 100}%` } as CSSProperties & { "--range-progress": string }}
           />
@@ -599,7 +624,7 @@ function TtsApp() {
             onClick={() => {
               setText("");
               setError("");
-              setAudioUrl(null);
+              clearAudio();
             }}
             disabled={!text}
           >지우기</button>
@@ -646,13 +671,13 @@ function TtsApp() {
           <div className="audio-result" aria-live="polite">
             <div className="result-title">
               <span className="result-icon"><Icon name="play" /></span>
-              <div><strong>음성이 준비됐어요</strong><span>MP3 (엠피쓰리) · {providerInfoLabel(provider)} · {modelInfo.label} · {speedSupported ? `${speed.toFixed(2)}×` : "기본 속도"}</span></div>
+              <div><strong>음성이 준비됐어요</strong><span>MP3 (엠피쓰리) · {audioMetadata.service} · {audioMetadata.model} · {audioMetadata.gender} · {audioMetadata.voice} · {speedSupported ? `${speed.toFixed(2)}×` : "기본 속도"}</span></div>
             </div>
             <audio controls src={audioUrl} aria-label="생성된 음성 미리 듣기" />
             <a
               className="download-button"
-              href={audioUrl}
-              download="텍스트-스피치.mp3"
+              href={downloadUrl ?? undefined}
+              download={downloadFilename}
             ><Icon name="download" /> MP3 (엠피쓰리) 내려받기</a>
           </div>
         )}

@@ -581,12 +581,15 @@
   border-radius: 8px;
   background: white;
   color: #42684d;
+  cursor: pointer;
+  font-family: inherit;
   font-size: 12px;
   font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
 }
 
+.download-button:disabled { opacity: 0.6; cursor: not-allowed; }
 .download-button:hover { border-color: #76a17b; background: #f4f9f2; }
 .download-button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
 

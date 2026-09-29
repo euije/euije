@@ -73,7 +73,7 @@ const CLOUD_PROVIDERS = new Set<ProviderId>(["google", "openrouter", "azure", "e
 // Secondary per-instance throttle. Turnstile is required on Vercel deployments.
 const recentRequests = new Map<string, number[]>();
 const WINDOW_MS = 10 * 60 * 1000;
-const MAX_REQUESTS_PER_WINDOW = 8;
+const MAX_REQUESTS_PER_WINDOW = 200;
 const MAX_CHARACTERS = 1200;
 const MAX_TEXT_BYTES = 4900;
 
@@ -188,9 +188,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (!sameSiteRequest(req)) return fail(res, 403, "이 사이트에서 보낸 요청만 처리할 수 있어요.");
 
   const ip = getClientIp(req);
-  if (!allowRequest(ip, Date.now())) {
-    return fail(res, 429, "요청이 잠시 몰렸어요. 10분 뒤 다시 시도해 주세요.");
-  }
 
   let body = req.body;
   if (typeof body === "string") {
@@ -248,6 +245,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       ip,
     );
     if (!validTurnstile) return fail(res, 403, "보안 확인을 마친 뒤 다시 시도해 주세요.");
+    if (!allowRequest(ip, Date.now())) {
+      return fail(res, 429, "10분 동안 생성할 수 있는 횟수를 넘었어요. 잠시 뒤 다시 시도해 주세요.");
+    }
   } catch {
     return fail(res, 503, "보안 확인을 할 수 없어요. 잠시 후 다시 시도해 주세요.");
   }

@@ -432,6 +432,24 @@
 
 .section-divider { height: 1px; margin: 25px 0 22px; background: #edf0ed; }
 .text-heading { margin-bottom: 13px; }
+.script-heading-copy { min-width: 0; }
+.script-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+.sample-buttons { display: flex; flex-wrap: wrap; gap: 5px; }
+.sample-buttons button {
+  min-height: 27px;
+  padding: 3px 8px;
+  border: 1px solid #dce8dd;
+  border-radius: 7px;
+  background: #f7faf7;
+  color: #4d725c;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.sample-buttons button:hover { border-color: #8fb497; background: #eef6ef; }
+.sample-buttons button:focus-visible { outline: 3px solid rgb(106 156 123 / 25%); outline-offset: 2px; }
 
 .char-count {
   display: flex;
@@ -628,6 +646,9 @@
   .hero-sound { gap: 4px; transform: translate(-50%, -50%) scale(0.82); }
   .studio-card { margin-top: 12px; padding: 23px 19px 22px; border-radius: 16px; }
   .card-heading h2 { font-size: 19px; }
+  .script-title-row { gap: 6px; }
+  .sample-buttons { gap: 4px; }
+  .sample-buttons button { min-height: 28px; padding: 3px 6px; font-size: 10px; }
   .field-hint { font-size: 11px; }
   .studio-card > .field-block { margin-top: 22px; }
   .model-list { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 7px; }

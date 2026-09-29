@@ -73,7 +73,16 @@ const AZURE_VOICES: Record<Gender, Voice[]> = {
 
 const GEMINI_MODELS = ["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"];
 
-type ModelChoice = { id: string; label: string; detail: string; price: string; supportsSpeed?: boolean };
+type ModelChoice = {
+  id: string;
+  label: string;
+  detail: string;
+  price: string;
+  supportsSpeed?: boolean;
+  speedMin?: number;
+  speedMax?: number;
+  speedStep?: number;
+};
 
 const OPENROUTER_VOICES: Record<string, Record<Gender, Voice[]>> = {
   "fish-audio/s2.1-pro-free:free": {
@@ -88,23 +97,23 @@ const OPENROUTER_VOICES: Record<string, Record<Gender, Voice[]>> = {
 
 const MODEL_OPTIONS: Record<ProviderId, ModelChoice[]> = {
   google: [
-    { id: "standard", label: "Standard (표준 음성)", detail: "가볍게 시작", price: "월 400만 자 무료 · 이후 100만 자당 미화 4달러" },
-    { id: "neural2", label: "Neural2 (뉴럴 2)", detail: "균형 잡힌 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 16달러" },
-    { id: "wavenet", label: "WaveNet (웨이브넷)", detail: "자연스러운 합성 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 16달러" },
-    { id: "chirp3hd", label: "Chirp 3 HD (처프 3 고음질)", detail: "생성형 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 30달러" },
+    { id: "standard", label: "Standard (표준 음성)", detail: "가볍게 시작", price: "월 400만 자 무료 · 이후 100만 자당 미화 4달러", speedMin: 0.25, speedMax: 2 },
+    { id: "neural2", label: "Neural2 (뉴럴 2)", detail: "균형 잡힌 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 16달러", speedMin: 0.25, speedMax: 2 },
+    { id: "wavenet", label: "WaveNet (웨이브넷)", detail: "자연스러운 합성 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 16달러", speedMin: 0.25, speedMax: 2 },
+    { id: "chirp3hd", label: "Chirp 3 HD (처프 3 고음질)", detail: "생성형 음성", price: "월 100만 자 무료 · 이후 100만 자당 미화 30달러", speedMin: 0.25, speedMax: 2 },
     { id: "gemini-3.8-flash-lite-tts", label: "Gemini Flash-Lite TTS (제미나이 고속·경량 음성)", detail: "빠르고 비용 효율적", price: "Gemini API (제미나이 API) 종량제 · 사용 토큰 수 기준", supportsSpeed: false },
     { id: "gemini-3.8-flash-tts", label: "Gemini Flash TTS (제미나이 고속 음성)", detail: "표현력 중심", price: "Gemini API (제미나이 API) 종량제 · 사용 토큰 수 기준", supportsSpeed: false },
   ],
   openrouter: [
     { id: "fish-audio/s2.1-pro-free:free", label: "Fish Audio S2.1 Pro Free (피시 오디오 S2.1 프로 무료 모델)", detail: "무료 · 한국어 포함 83개 언어", price: "무료 · 사용량 정책 적용", supportsSpeed: false },
-    { id: "microsoft/mai-voice-2-flash", label: "MAI Voice-2 Flash (마이 음성 2 플래시)", detail: "한국어 Haena (해나) · Junho (준호)", price: "100만 자당 미화 15달러" },
+    { id: "microsoft/mai-voice-2-flash", label: "MAI Voice-2 Flash (마이 음성 2 플래시)", detail: "한국어 Haena (해나) · Junho (준호)", price: "100만 자당 미화 15달러", speedMin: 0.5, speedMax: 2 },
   ],
   azure: [
-    { id: "neural", label: "Azure Neural (애저 신경망 음성)", detail: "한국어 신경망 음성", price: "Azure (애저) 사용량 기준 · 지역별 요금" },
+    { id: "neural", label: "Azure Neural (애저 신경망 음성)", detail: "한국어 신경망 음성", price: "Azure (애저) 사용량 기준 · 지역별 요금", speedMin: 0.5, speedMax: 2 },
   ],
   elevenlabs: [
-    { id: "eleven_multilingual_v2", label: "Multilingual v2 (다국어 버전 2)", detail: "다국어 음성", price: "계정에 남은 크레딧에서 차감" },
-    { id: "eleven_flash_v2_5", label: "Flash v2.5 (빠른 합성 버전 2.5)", detail: "빠른 합성", price: "계정에 남은 크레딧에서 차감" },
+    { id: "eleven_multilingual_v2", label: "Multilingual v2 (다국어 버전 2)", detail: "다국어 음성", price: "계정에 남은 크레딧에서 차감", speedMin: 0.7, speedMax: 1.2 },
+    { id: "eleven_flash_v2_5", label: "Flash v2.5 (빠른 합성 버전 2.5)", detail: "빠른 합성", price: "계정에 남은 크레딧에서 차감", speedMin: 0.7, speedMax: 1.2 },
   ],
   supertonic: [
     { id: "supertonic-3", label: "Supertonic 3 (수퍼토닉 3)", detail: "기기에서 직접 생성", price: "최초 다운로드 약 400MB (400메가바이트) · 이후 저장된 모델 사용" },
@@ -116,7 +125,6 @@ const PROVIDERS: { id: ProviderId; label: string }[] = [
   { id: "openrouter", label: "OpenRouter (오픈라우터)" },
   { id: "azure", label: "Azure Speech (애저 음성)" },
   { id: "elevenlabs", label: "ElevenLabs (일레븐랩스)" },
-  { id: "supertonic", label: "Supertonic 3 (수퍼토닉 3) · 이 기기에서 실행" },
 ];
 
 const SUPERTONIC_VOICES: Record<Gender, Voice[]> = {
@@ -134,6 +142,11 @@ const DEFAULT_MODELS: Record<ProviderId, string> = {
 
 const MAX_CHARACTERS = 5000;
 const GOOGLE_CLOUD_MAX_TEXT_BYTES = 5000;
+const SAMPLE_SENTENCES = [
+  "안녕하세요. 오늘도 천천히, 편안한 하루 보내세요.",
+  "따뜻한 차 한 잔과 함께 잠시 쉬어 가도 괜찮아요.",
+  "오늘 할 일을 하나씩 마치면 하루가 한결 가벼워질 거예요.",
+];
 const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY;
 const TURNSTILE_SESSION_STORAGE_KEY = "tts-turnstile-session-expires";
 
@@ -263,6 +276,9 @@ function TtsApp() {
   const modelOptions = MODEL_OPTIONS[provider];
   const modelInfo = modelOptions.find((item) => item.id === model) ?? modelOptions[0];
   const speedSupported = modelInfo.supportsSpeed !== false;
+  const speedMin = speedSupported ? (modelInfo.speedMin ?? 0.7) : 1;
+  const speedMax = speedSupported ? (modelInfo.speedMax ?? 1.2) : 1;
+  const speedStep = modelInfo.speedStep ?? 0.05;
   const genderSupported = !(provider === "openrouter" && model === "fish-audio/s2.1-pro-free:free");
   const hasTurnstileSession = turnstileSessionExpiresAt > Date.now();
   const voices = provider === "elevenlabs" ? elevenVoices : getStaticVoices(provider, model, gender);
@@ -304,6 +320,10 @@ function TtsApp() {
     if (!downloadUrl) return;
     return () => URL.revokeObjectURL(downloadUrl);
   }, [downloadUrl]);
+
+  useEffect(() => {
+    setSpeed((current) => Math.min(speedMax, Math.max(speedMin, current)));
+  }, [speedMin, speedMax]);
 
   const clearAudio = () => {
     setAudioUrl(null);
@@ -636,16 +656,16 @@ function TtsApp() {
             id="speed"
             className="speed-slider"
             type="range"
-            min="0.7"
-            max="1.2"
-            step="0.05"
+            min={speedMin}
+            max={speedMax}
+            step={speedStep}
             value={speed}
             disabled={!speedSupported}
             onChange={(event) => {
               setSpeed(Number(event.target.value));
               clearAudio();
             }}
-            style={{ "--range-progress": `${((speed - 0.7) / 0.5) * 100}%` } as CSSProperties & { "--range-progress": string }}
+            style={{ "--range-progress": `${speedSupported ? ((speed - speedMin) / (speedMax - speedMin)) * 100 : 50}%` } as CSSProperties & { "--range-progress": string }}
           />
           <div className="range-labels"><span>느리게</span><span>보통</span><span>빠르게</span></div>
         </div>
@@ -653,9 +673,25 @@ function TtsApp() {
         <div className="section-divider" />
 
         <div className="card-heading text-heading">
-          <div>
+          <div className="script-heading-copy">
             <span className="section-kicker">02 / SCRIPT (읽을 문장)</span>
-            <h2>읽을 문장</h2>
+            <div className="script-title-row">
+              <h2>읽을 문장</h2>
+              <div className="sample-buttons" role="group" aria-label="테스트 문장">
+                {SAMPLE_SENTENCES.map((sentence, index) => (
+                  <button
+                    type="button"
+                    key={sentence}
+                    aria-label={`테스트 문장 ${index + 1} 입력`}
+                    onClick={() => {
+                      setText(sentence);
+                      setError("");
+                      clearAudio();
+                    }}
+                  >테스트 {index + 1}</button>
+                ))}
+              </div>
+            </div>
           </div>
           <span className={`char-count ${exceedsTextLimit ? "over-limit" : ""}`}>
             {characterCount.toLocaleString()} <span>/ {characterLimit.toLocaleString()}자</span>

@@ -80,6 +80,20 @@ const TURNSTILE_SESSION_TTL_MS = 30 * 60 * 1000;
 const MAX_CHARACTERS = 5000;
 const GOOGLE_CLOUD_MAX_TEXT_BYTES = 5000;
 
+function getSpeedRange(provider: ProviderId, model: string): { min: number; max: number } | null {
+  if (provider === "google") {
+    if ((GEMINI_TTS_MODELS as readonly string[]).includes(model)) return { min: 1, max: 1 };
+    if (Object.prototype.hasOwnProperty.call(GOOGLE_VOICES, model)) return { min: 0.25, max: 2 };
+  }
+  if (provider === "openrouter") {
+    if (model === "fish-audio/s2.1-pro-free:free") return { min: 1, max: 1 };
+    if (model === "microsoft/mai-voice-2-flash") return { min: 0.5, max: 2 };
+  }
+  if (provider === "azure" && model === "neural") return { min: 0.5, max: 2 };
+  if (provider === "elevenlabs" && (ELEVENLABS_MODELS as readonly string[]).includes(model)) return { min: 0.7, max: 1.2 };
+  return null;
+}
+
 function fail(res: ApiResponse, status: number, error: string) {
   return res.status(status).json({ error });
 }
@@ -267,8 +281,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return fail(res, 400, "선택한 음성 서비스를 사용할 수 없어요.");
   }
   if (!(gender === "FEMALE" || gender === "MALE")) return fail(res, 400, "음성 성별을 다시 확인해 주세요.");
-  if (typeof speakingRate !== "number" || !Number.isFinite(speakingRate) || speakingRate < 0.7 || speakingRate > 1.2) {
-    return fail(res, 400, "속도는 0.7배에서 1.2배 사이로 설정해 주세요.");
+  const speedRange = getSpeedRange(provider, model);
+  if (!speedRange || typeof speakingRate !== "number" || !Number.isFinite(speakingRate) || speakingRate < speedRange.min || speakingRate > speedRange.max) {
+    return fail(res, 400, "선택한 모델에서 지원하는 말하기 속도를 확인해 주세요.");
   }
 
   let voiceIsAllowed = false;
@@ -315,7 +330,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   try {
     if (provider === "google") {
       if ((GEMINI_TTS_MODELS as readonly string[]).includes(model)) {
-        const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_TTS_API_KEY;
+        const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
         if (!apiKey) return fail(res, 503, "Google Gemini API (구글 제미나이 API) 키를 서버 설정에 등록해 주세요.");
         const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
           method: "POST",

@@ -1,4 +1,11 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "fluid": true,
+  "functions": {
+    "api/synthesize.ts": {
+      "maxDuration": 300
+    }
+  },
   "rewrites": [
     { "source": "/tts", "destination": "/" },
     { "source": "/tts/", "destination": "/" }

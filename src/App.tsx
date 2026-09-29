@@ -691,8 +691,17 @@ function TtsApp() {
               clearTurnstileSessionExpiry();
             }
             if (!response.ok) {
-              const result = (await response.json()) as { error?: string };
-              const requestError = new Error(result.error || "음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.") as Error & { status?: number };
+              const responseText = await response.text();
+              let responseError = "";
+              try {
+                const result = JSON.parse(responseText) as { error?: string };
+                responseError = result.error ?? "";
+              } catch {
+                responseError = response.status === 504
+                  ? "음성 생성이 5분 안에 끝나지 않아 서버 연결이 종료됐어요. 문장을 더 짧게 나눠 다시 시도해 주세요."
+                  : `음성을 만들지 못했어요. 서버 응답을 확인해 주세요. (오류 ${response.status})`;
+              }
+              const requestError = new Error(responseError || "음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.") as Error & { status?: number };
               requestError.status = response.status;
               throw requestError;
             }
